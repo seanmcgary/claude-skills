@@ -11,6 +11,8 @@ This skill runs mechanical gates first, then dispatches three parallel reviewer 
 
 ## Mechanical Gates (run first, in order)
 
+> **Team-mode banner:** If team tools are available (SendMessage / shared task list / spawn mechanism) and you are the QA teammate, the gate COMMIT actions ("commit them", "fix them and commit"), step 4 (Fold fixes), and step 5 (Re-run gates as commits) are SUSPENDED -- see "Running as a team-mode teammate" at the end of the Process section; you review READ-ONLY and articulate, the Implementer applies and commits.
+
 These gates run BEFORE dispatching reviewers. A red gate blocks reviewer dispatch -- there is no point reviewing a broken branch.
 
 1. **`make fmt`** -- run it; if any files change, commit them (`fix: format code`).
@@ -20,6 +22,8 @@ These gates run BEFORE dispatching reviewers. A red gate blocks reviewer dispatc
 Only proceed to the reviewer dispatch once all three gates are green.
 
 ## Process
+
+> **Team-mode banner:** If team tools are available (SendMessage / shared task list / spawn mechanism) and you are the QA teammate, the gate COMMIT actions ("commit them", "fix them and commit"), step 4 (Fold fixes), and step 5 (Re-run gates as commits) are SUSPENDED -- see "Running as a team-mode teammate" at the end of this section; you review READ-ONLY and articulate, the Implementer applies and commits.
 
 ### 1. Compute the diff
 
@@ -63,6 +67,41 @@ Output the final table:
 | # | File:Line | Finding | Dimension | Severity | Disposition | Notes |
 |---|-----------|---------|-----------|----------|-------------|-------|
 ```
+
+### Running as a team-mode teammate
+
+> **⚠️ UNVALIDATED-BY-LIVE-TEAM:** Team mode ships behind the experimental agent-teams flag (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) and has NOT been validated by a live team run. The RED/GREEN ground-truth re-run (QA-as-teammate re-reviewing the PR #273 diff vs. the logged 13/13 subagent baseline, on both catch-rate and token cost) was NOT performed. Do not treat the teammate reviewer path as proven equivalent to the standalone subagent path until that run is done.
+
+**When this applies.** This subsection applies ONLY when team tools (SendMessage / shared task list / the spawn mechanism) are AVAILABLE and you were spawned as the **QA teammate** (model `claude-opus-4-8[1m]`) by the lead session running `ship-feature` stage 4. Detect team mode by the AVAILABILITY of the team tools, NOT by reading the env var (a settings.json env var is not reliably exported into the Bash shell). **If team tools are absent, ignore this subsection entirely** -- the standalone behavior above is UNCHANGED: the invoker runs the writing mechanical gates (`make fmt`/`make lint`/`make test` and commits their fixes), dispatches the reviewers, applies fixes, and folds them via steps 4-5 itself.
+
+You are a teammate, not the lead. You never spawn teammates (teammates cannot). You never orchestrate the pipeline or advance it past stage 4. Ignore `ship-feature`'s `## Team Mode` section -- it is a lead-only orchestration script.
+
+**Core rule: QA reviews READ-ONLY and articulates; the Implementer applies and commits.** You NEVER edit code, never run the writing gates, never commit. File ownership: the Implementer (model `claude-sonnet-5`) writes all source and all local commits; QA writes NO files.
+
+The following are SUSPENDED for you: the Mechanical Gates' commit actions ("if any files change, commit them", "fix them and commit"), Process **step 4 (Fold fixes into the branch)**, and Process **step 5 (Re-run the three gates)** as commits. You do the read-only equivalents below instead.
+
+**1. Mechanical gates -- READ-ONLY, and the red-gate-blocks-dispatch invariant is preserved.** Run the gates as read-only checks and treat any failure as a finding -- never edit, never commit:
+- `make fmtcheck` (the non-mutating form of `make fmt`)
+- `make lint`
+- `make test`
+
+If ANY gate is red, do NOT dispatch the reviewers. Articulate the failures to the Implementer via SendMessage (create one shared task item per failure), and WAIT for the Implementer to signal a green re-verify before dispatching the three reviewer subagents. This preserves the base skill's "a red gate blocks reviewer dispatch" invariant -- there is no point reviewing a broken branch.
+
+**2. Act only on a QUIESCED tree.** You and the Implementer share one working tree and git index. Run your read-only gates and compute the branch diff ONLY after the Implementer signals `commit N complete, tree quiesced` via SendMessage. NEVER run git operations that overlap the Implementer's -- do not read the tree while it is mid-commit or mid-rebase. If the harness offers git worktrees (see the `using-git-worktrees` skill), use one worktree per teammate to make the parallelism truly race-free; otherwise rely strictly on the quiescence signal.
+
+**3. Dispatch the three fresh reviewer subagents UNCHANGED.** Dispatch the security, quality, and standards reviewers exactly as written in step 2 above, over the branch diff. Because teammates cannot spawn teammates, these MUST be classic Agent-tool subagents (not team members) -- which is exactly what the base skill already uses, so fresh-context review is preserved.
+
+**4. Triage, then ARTICULATE each Fix (do not apply it).** Triage per step 3 (Fix / Reject / Defer). For each **Fix** finding: create ONE shared task-list item and SendMessage the Implementer the precise change (file:line, what to change, why, and the rule cited). Do NOT edit. The Implementer claims the task, applies the fix, re-runs the writing gates to green, commits it (fixup+autosquash where the fix maps cleanly to one existing commit, else a conventional commit), and signals `commit <sha> complete, tree quiesced`, then WAITS.
+- **Reject:** record the reason (one line) in the disposition table; do not create a task.
+- **Defer:** SendMessage the Implementer to add a TODO comment citing the finding; record it as deferred.
+
+**5. VERIFY each completion and loop to convergence.** After each `commit <sha> complete` signal, re-check the tree (quiesced) and verify the fix against the ORIGINAL finding. If unsatisfied, re-articulate to the Implementer and keep the task open. Loop until all Fix findings are closed.
+
+**6. Whole-PR pre-open pass, then report review-ready.** Once converged, run the whole-PR pre-open pass (the full read-only gate + diff review over the complete branch) and then SendMessage the LEAD that the branch is review-ready, including the findings-disposition table from step 6.
+
+**Architecture-deviation findings -> flag the LEAD and BLOCK.** If a finding would require deviating from the approved plan's architecture (autonomy exception 2), do NOT decide it yourself and do NOT articulate a fix -- SendMessage the LEAD and BLOCK until the lead acknowledges with a decision. Because SendMessage delivery is not battle-tested, the fail-safe default on non-delivery is to STALL (never proceed).
+
+**"Surface to the user" is redefined for teammates.** Everywhere this skill (and its Red Flags) says to surface, escalate, or report to the user, a teammate instead **SendMessages the LEAD**. Teammates NEVER address the human directly for pipeline decisions; the lead is the sole human-facing router.
 
 ## Reviewer Rubrics
 

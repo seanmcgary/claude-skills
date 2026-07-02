@@ -24,6 +24,8 @@ Pushing back is legitimate and expected. A reviewer flagging dead code that has 
 
 ## Setup
 
+> **Team mode (experimental):** If team tools (SendMessage / shared task list / the spawn mechanism) are available and you are the **Feedback teammate**, the following are **SUSPENDED** — Setup `git push` + `gh pr create` (the lead already did these), step 8 (Reply to threads), and step 9 (Push); and the round counter comes from Pipeline State, not the step-"Determine current round" git log. See **"Running as a team-mode teammate"** at the end of this file before any push/reply. When team tools are absent, everything below runs verbatim as the default.
+
 ### If no PR exists yet
 
 1. Push the branch: `git push -u origin <branch>`
@@ -45,6 +47,8 @@ git log --oneline --grep="address PR #<n> review round" | wc -l
 The count gives the last completed round. Next round is `k = count + 1`. Default cap `N = 3` unless overridden.
 
 ## The Round Loop
+
+> **Team mode (experimental):** If team tools are available and you are the **Feedback teammate**, the following are **SUSPENDED** within this loop — step 8 (Reply to threads) and step 9 (Push); and the round counter `k` comes from the lead-maintained Pipeline State `round`, NOT from the "Determine current round" git-log count. See **"Running as a team-mode teammate"** at the end of this file before any push/reply. When team tools are absent, the loop runs verbatim as the default.
 
 For each round `k` (1 to N):
 
@@ -113,7 +117,7 @@ gh pr view <n> --repo <owner>/<repo> --json comments \
 **B. Inline review threads** (if any):
 
 ```bash
-gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$pr){reviewThreads(first:50){nodes{isResolved comments(first:10){nodes{author{login} body path}}}}}}}' \
+gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$pr){reviewThreads(first:50){nodes{id isResolved comments(first:10){nodes{id databaseId author{login} body path}}}}}}}' \
   -f owner=<owner> -f repo=<repo> -F pr=<n>
 ```
 
@@ -219,3 +223,54 @@ Actionable findings remaining at termination: <n>
 ```
 
 If the cap was reached with findings still open, explicitly note that the user should review the remaining items.
+
+## Running as a team-mode teammate
+
+> **⚠️ UNVALIDATED-BY-LIVE-TEAM:** Team mode ships behind the team-tool-availability branch and has NOT been validated by a live team run. The RED/GREEN ground-truth re-run (re-reviewing the PR #273 diff with a teammate reviewer vs. the logged 13/13 subagent baseline, on catch-rate AND token cost) was NOT performed. Treat this section as provisional.
+
+**When this applies.** This section applies **only** when team tools (SendMessage / shared task list / the spawn mechanism) are **available** AND you were spawned as the **Feedback teammate** (model `claude-opus-4-8[1m]`). Detection branches on **tool availability**, not on reading `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` (a settings.json env var is not reliably exported into the Bash shell). **If team tools are absent, ignore this entire section** — the standalone flow above is the behavior verbatim: a single session pushes, opens the PR, posts replies, and updates state itself. That standalone behavior is **UNCHANGED** by anything here.
+
+**Your role: PREPARE ONLY.** Push and reply authority stay with the LEAD. You collect, triage, apply fixes, run gates, commit **locally**, and draft replies — then you hand the LEAD one package and wait. You **never** push, **never** post replies, **never** merge.
+
+### What is suspended (by number)
+
+- **Setup — `git push -u origin <branch>` and `gh pr create`:** the LEAD already pushed the branch and opened the PR before spawning you. Do NOT run these.
+- **Setup — "Determine current round" git-log count:** do NOT derive the round from `git log --grep`. That count inflates if the LEAD defers a push. Derive round `k` from the **lead-maintained Pipeline State `round`** (in `docs/superpowers/plans/<topic>.pipeline-state.md`), which advances only after a successful push and is the authoritative cap counter.
+- **Step 8 (Reply to every handled finding):** SUSPENDED. You DRAFT replies; the LEAD posts them.
+- **Step 9 (Push):** SUSPENDED. The LEAD pushes.
+
+Steps 1–7 and step 10 run as written, with the surface-to-the-LEAD redefinition below.
+
+### Round cycle (team mode)
+
+1. **Round number.** Read `round` from the Pipeline State file. That is your `k`. The **N=3 cap is enforced by the LEAD** at round advancement — you do not advance it.
+
+2. **Wait for the bot review using the LEAD-supplied `PREV_RUN_ID`.** You do not push, so you cannot capture `PREV_RUN_ID` yourself. On the **first** round the LEAD supplies the initial `PREV_RUN_ID` at spawn; on every subsequent round the LEAD hands it back after each push (see the handback below). Run the staleness-guard poll from step 2 of the loop with that value. Do NOT run the pre-push `PREV_RUN_ID` capture snippet (you never push).
+
+3. **Collect / triage / apply-fix / gate / commit LOCALLY.** Run steps 3–7 as written: collect all findings (read-only `gh`), triage each Fix/Push-back/Defer, apply Fix changes, run `make fmt && make lint && make test` to green, and create the round commit **locally only**: `fix: address PR #<n> review round <k> — <summary>` (conventional, header ≤ 100 chars, **no** `Co-Authored-By` or any other trailers). Do NOT push.
+
+4. **Hand the LEAD one package via SendMessage** and STOP. The package contains:
+   - the commit **sha** you created,
+   - the **findings-disposition table** (the per-finding table from the status report),
+   - **per-thread draft replies keyed by thread/comment ID** (so the LEAD can post each to the right place), and
+   - the **bot run ID** you acted on.
+
+5. **Block until the LEAD executes and hands back.** The LEAD runs `git push` **FIRST**, then posts the replies via `gh api` **SECOND** — this is a deliberate, documented deviation from the standalone step 8 → step 9 order (standalone posts replies then pushes). The LEAD updates the Pipeline State `round` **only after a successful push**, then SendMessages you `pushed round k, PREV_RUN_ID=<id>`.
+
+6. **Resume for round k+1.** Only after receiving `pushed round k, PREV_RUN_ID=<id>` do you begin the staleness-guard poll for round `k+1`, using that new `PREV_RUN_ID`. Loop from step 1.
+
+### Surface-to-the-LEAD redefinition
+
+Everywhere the standalone steps say "surface to the user" or "STOP and report to the user" — step 4 (ambiguous/contentious human comment), the bot-review staleness/freshness fallbacks in step 2, and the never-arrived-bot fallback — for a teammate this means **SendMessage the LEAD**. Teammates **never** address the human directly for pipeline decisions; the LEAD is the sole human-facing router.
+
+### Autonomy exceptions (BLOCKING, fail-safe)
+
+If you detect any of the three autonomy exceptions —
+1. an **ambiguous or contentious** human comment (unclear intent, disagreement with conventions, conflicting request),
+2. a **fix that requires an architecture deviation** from the approved plan, or
+3. the **round cap reached with actionable findings still open** —
+**STOP** and SendMessage the LEAD; do NOT act. **Block until the LEAD acknowledges/decides.** Because SendMessage delivery is not battle-tested, the default on non-delivery is to **STALL, never proceed** (fail-safe): a stalled stage the human can un-stick via the agent panel is preferable to crossing a human-judgment boundary unsupervised.
+
+### File ownership
+
+In stage 5 the Implementer is idle. You (Feedback) own the code changes and the **local round commit**. QA and all reviewer subagents write no files. You do NOT write the Pipeline State file (LEAD-owned) or the plan doc (Architect-owned).
