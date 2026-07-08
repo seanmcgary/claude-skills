@@ -148,14 +148,9 @@ For findings triaged as "Fix":
 
 ### 6. Pre-push quality gates
 
-**Always run before committing:**
-```bash
-make fmt
-make lint
-make test
-```
+**Always run the project's format, lint, and test commands before committing.** Discover them from the project's conventions doc (the first agent-instructions/standards file that exists at the repo root — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `STANDARDS.md`), the `Makefile`, or the package manifest (`package.json` scripts, `Cargo.toml`, `pyproject.toml`, etc.). Typical shapes: `make fmt` / `make lint` / `make test`, `npm run format` / `npm run lint` / `npm test`, `cargo fmt` / `cargo clippy` / `cargo test`.
 
-If a gate fails for reasons **unrelated to your changes** (pre-existing failures in master), note this in your status report and proceed. If a gate fails **because of your changes**, fix the issue before committing.
+If a gate fails for reasons **unrelated to your changes** (pre-existing failures on the default branch), note this in your status report and proceed. If a gate fails **because of your changes**, fix the issue before committing.
 
 ### 7. Commit
 
@@ -226,7 +221,7 @@ If the cap was reached with findings still open, explicitly note that the user s
 
 ## Running as a team-mode teammate
 
-> **⚠️ UNVALIDATED-BY-LIVE-TEAM:** Team mode ships behind the team-tool-availability branch and has NOT been validated by a live team run. The RED/GREEN ground-truth re-run (re-reviewing the PR #273 diff with a teammate reviewer vs. the logged 13/13 subagent baseline, on catch-rate AND token cost) was NOT performed. Treat this section as provisional.
+> **⚠️ UNVALIDATED-BY-LIVE-TEAM:** Team mode ships behind the team-tool-availability branch and has NOT been validated by a live team run. The RED/GREEN ground-truth re-run (re-reviewing a real PR diff with a teammate reviewer vs. a subagent baseline, on catch-rate AND token cost) was NOT performed. Treat this section as provisional.
 
 **When this applies.** This section applies **only** when team tools (SendMessage / shared task list / the spawn mechanism) are **available** AND you were spawned as the **Feedback teammate** (model `claude-opus-4-8[1m]`). Detection branches on **tool availability**, not on reading `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` (a settings.json env var is not reliably exported into the Bash shell). **If team tools are absent, ignore this entire section** — the standalone flow above is the behavior verbatim: a single session pushes, opens the PR, posts replies, and updates state itself. That standalone behavior is **UNCHANGED** by anything here.
 
@@ -247,7 +242,7 @@ Steps 1–7 and step 10 run as written, with the surface-to-the-LEAD redefinitio
 
 2. **Wait for the bot review using the LEAD-supplied `PREV_RUN_ID`.** You do not push, so you cannot capture `PREV_RUN_ID` yourself. On the **first** round the LEAD supplies the initial `PREV_RUN_ID` at spawn; on every subsequent round the LEAD hands it back after each push (see the handback below). Run the staleness-guard poll from step 2 of the loop with that value. Do NOT run the pre-push `PREV_RUN_ID` capture snippet (you never push).
 
-3. **Collect / triage / apply-fix / gate / commit LOCALLY.** Run steps 3–7 as written: collect all findings (read-only `gh`), triage each Fix/Push-back/Defer, apply Fix changes, run `make fmt && make lint && make test` to green, and create the round commit **locally only**: `fix: address PR #<n> review round <k> — <summary>` (conventional, header ≤ 100 chars, **no** `Co-Authored-By` or any other trailers). Do NOT push.
+3. **Collect / triage / apply-fix / gate / commit LOCALLY.** Run steps 3–7 as written: collect all findings (read-only `gh`), triage each Fix/Push-back/Defer, apply Fix changes, run the project's format/lint/test gates to green, and create the round commit **locally only**: `fix: address PR #<n> review round <k> — <summary>` (conventional, header ≤ 100 chars, **no** `Co-Authored-By` or any other trailers). Do NOT push.
 
 4. **Hand the LEAD one package via SendMessage** and STOP. The package contains:
    - the commit **sha** you created,

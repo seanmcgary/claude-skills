@@ -9,15 +9,27 @@ The branch author cannot effectively review their own commits. Fresh-context sub
 
 This skill runs mechanical gates first, then dispatches three parallel reviewer subagents (security, quality, standards) over the branch diff, triages their findings, applies fixes as commits, re-runs the gates, and produces a findings-disposition table.
 
+## Project conventions doc
+
+This skill stays at the workflow level; every project-specific rule (coding style, auth model, schema conventions, commit format, gate commands) lives in repo-level files, NOT here. Resolve them once, up front:
+
+- **Prose conventions — the "conventions doc":** the first of these that exists at the repo root: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `STANDARDS.md`, `STYLEGUIDE.md`/`STYLE.md`. If more than one exists, read them in that order and treat later ones as supplements (a primary agent-instructions file may link out to a detailed `STANDARDS.md` / `docs/` guide — follow those links). "Read the conventions doc" below means this resolved set.
+- **Machine-enforced style — always also consult:** `.editorconfig` and the project's linter/formatter configs (`.eslintrc`/`.prettierrc`, `.golangci.yml`, `rustfmt.toml`, `ruff.toml`/`pyproject.toml`, etc.). These are the source of truth for formatting/lint rules; the mechanical gates run them.
+- **Gate commands** are discovered as described in Mechanical Gates below.
+
+If no conventions doc exists, note that in the findings table and review against the universal rubric categories alone (plus whatever the linter/formatter configs enforce). To generate one from the codebase for future runs, use the `identify-standards` skill.
+
 ## Mechanical Gates (run first, in order)
 
 > **Team-mode banner:** If team tools are available (SendMessage / shared task list / spawn mechanism) and you are the QA teammate, the gate COMMIT actions ("commit them", "fix them and commit"), step 4 (Fold fixes), and step 5 (Re-run gates as commits) are SUSPENDED -- see "Running as a team-mode teammate" at the end of the Process section; you review READ-ONLY and articulate, the Implementer applies and commits.
 
 These gates run BEFORE dispatching reviewers. A red gate blocks reviewer dispatch -- there is no point reviewing a broken branch.
 
-1. **`make fmt`** -- run it; if any files change, commit them (`fix: format code`).
-2. **`make lint`** -- run it; must produce 0 issues. If there are findings, fix them and commit (`fix: resolve lint findings`). Re-run until clean.
-3. **`make test`** -- run the full test suite (`make test`). If tests fail, fix and commit. Re-run until green.
+Discover the project's format, lint, and test commands from its conventions doc (see "Project conventions doc" above), its `Makefile`, or its package manifest (`package.json` scripts, `Cargo.toml`, `pyproject.toml`, etc.). Typical shapes: `make fmt`/`make lint`/`make test`, `npm run format`/`npm run lint`/`npm test`, `cargo fmt`/`cargo clippy`/`cargo test`. Run them in this order:
+
+1. **Format** -- run the formatter; if any files change, commit them (`fix: format code`).
+2. **Lint** -- run the linter; must produce 0 issues. If there are findings, fix them and commit (`fix: resolve lint findings`). Re-run until clean.
+3. **Test** -- run the full test suite. If tests fail, fix and commit. Re-run until green.
 
 Only proceed to the reviewer dispatch once all three gates are green.
 
@@ -27,19 +39,23 @@ Only proceed to the reviewer dispatch once all three gates are green.
 
 ### 1. Compute the diff
 
+Determine the repo's default branch, then diff against the merge-base:
+
 ```bash
-git diff $(git merge-base origin/master HEAD)...HEAD
+BASE=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/@@')
+BASE=${BASE:-origin/main}   # fall back to origin/main, or origin/master on older repos
+git diff $(git merge-base "$BASE" HEAD)...HEAD
 ```
 
-This is the scope the reviewers examine. If the diff exceeds 3000 lines, chunk it by package directory for each reviewer so they can review in focused passes rather than rationalizing "the diff is too large to review fully."
+This is the scope the reviewers examine. If the diff exceeds 3000 lines, chunk it by directory/package for each reviewer so they can review in focused passes rather than rationalizing "the diff is too large to review fully."
 
 ### 2. Dispatch three reviewers in parallel
 
-Send three Agent tool calls in a single message (one per dimension). Each subagent receives:
+Send three Agent tool calls in a single message (one per dimension). Resolve the project's conventions doc as described in "Project conventions doc" above. Each subagent receives:
 - The diff scope (the command above, or the chunked file list)
-- The path to CLAUDE.md: `/Users/seanmcgary/Code/ecloud-platform/CLAUDE.md`
+- The path to the conventions doc
 - Its dimension-specific rubric (below, verbatim)
-- The instruction: "Read CLAUDE.md first. Run `git diff $(git merge-base origin/master HEAD)...HEAD` to see the full diff. For every finding, cite the specific rule violated (CLAUDE.md section title or codebase precedent). Output findings as a structured list: `| # | File:Line | Finding | Severity | Rule Cited |`. Do not modify any files."
+- The instruction: "Read the conventions doc first. Run the diff command above to see the full diff. For every finding, cite the specific rule violated (conventions-doc section title or codebase precedent). Output findings as a structured list: `| # | File:Line | Finding | Severity | Rule Cited |`. Do not modify any files."
 
 If a reviewer returns garbage (no structured findings, off-topic, or fewer than 3 sentences), re-dispatch that single reviewer once with a more explicit prompt. If the re-dispatch also returns garbage or off-topic output, perform that dimension's review yourself inline in the current context using the same rubric, and note the fallback in the findings table.
 
@@ -52,12 +68,12 @@ For each finding from all three reviewers, decide:
 
 ### 4. Fold fixes into the branch
 
-- If a fix belongs to exactly one existing commit, use `git commit --fixup=<sha>` and then `git rebase -i --autosquash $(git merge-base origin/master HEAD)` to fold it in.
+- If a fix belongs to exactly one existing commit, use `git commit --fixup=<sha>` and then re-resolve `$BASE` as in step 1 and run `git rebase -i --autosquash $(git merge-base "$BASE" HEAD)` to fold it in.
 - If a fix spans multiple commits or is new work, create a conventional commit (e.g., `fix: add cross-tenant test for GetSecret`).
 
 ### 5. Re-run the three gates
 
-After all fixes are applied, re-run in order: `make fmt` -> `make lint` -> `make test`. Fix any regressions. The branch must be green before producing the final output.
+After all fixes are applied, re-run the project's gates in order: format -> lint -> test. Fix any regressions. The branch must be green before producing the final output.
 
 ### 6. Findings-disposition table
 
@@ -70,9 +86,9 @@ Output the final table:
 
 ### Running as a team-mode teammate
 
-> **⚠️ UNVALIDATED-BY-LIVE-TEAM:** Team mode ships behind the experimental agent-teams flag (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) and has NOT been validated by a live team run. The RED/GREEN ground-truth re-run (QA-as-teammate re-reviewing the PR #273 diff vs. the logged 13/13 subagent baseline, on both catch-rate and token cost) was NOT performed. Do not treat the teammate reviewer path as proven equivalent to the standalone subagent path until that run is done.
+> **⚠️ UNVALIDATED-BY-LIVE-TEAM:** Team mode ships behind the experimental agent-teams flag (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) and has NOT been validated by a live team run. The RED/GREEN ground-truth re-run (QA-as-teammate re-reviewing a real PR diff vs. a subagent baseline, on both catch-rate and token cost) was NOT performed. Do not treat the teammate reviewer path as proven equivalent to the standalone subagent path until that run is done.
 
-**When this applies.** This subsection applies ONLY when team tools (SendMessage / shared task list / the spawn mechanism) are AVAILABLE and you were spawned as the **QA teammate** (model `claude-opus-4-8[1m]`) by the lead session running `ship-feature` stage 4. Detect team mode by the AVAILABILITY of the team tools, NOT by reading the env var (a settings.json env var is not reliably exported into the Bash shell). **If team tools are absent, ignore this subsection entirely** -- the standalone behavior above is UNCHANGED: the invoker runs the writing mechanical gates (`make fmt`/`make lint`/`make test` and commits their fixes), dispatches the reviewers, applies fixes, and folds them via steps 4-5 itself.
+**When this applies.** This subsection applies ONLY when team tools (SendMessage / shared task list / the spawn mechanism) are AVAILABLE and you were spawned as the **QA teammate** (model `claude-opus-4-8[1m]`) by the lead session running `ship-feature` stage 4. Detect team mode by the AVAILABILITY of the team tools, NOT by reading the env var (a settings.json env var is not reliably exported into the Bash shell). **If team tools are absent, ignore this subsection entirely** -- the standalone behavior above is UNCHANGED: the invoker runs the writing mechanical gates (the project's format/lint/test commands and commits their fixes), dispatches the reviewers, applies fixes, and folds them via steps 4-5 itself.
 
 You are a teammate, not the lead. You never spawn teammates (teammates cannot). You never orchestrate the pipeline or advance it past stage 4. Ignore `ship-feature`'s `## Team Mode` section -- it is a lead-only orchestration script.
 
@@ -81,9 +97,9 @@ You are a teammate, not the lead. You never spawn teammates (teammates cannot). 
 The following are SUSPENDED for you: the Mechanical Gates' commit actions ("if any files change, commit them", "fix them and commit"), Process **step 4 (Fold fixes into the branch)**, and Process **step 5 (Re-run the three gates)** as commits. You do the read-only equivalents below instead.
 
 **1. Mechanical gates -- READ-ONLY, and the red-gate-blocks-dispatch invariant is preserved.** Run the gates as read-only checks and treat any failure as a finding -- never edit, never commit:
-- `make fmtcheck` (the non-mutating form of `make fmt`)
-- `make lint`
-- `make test`
+- the format **check** (the non-mutating form of the formatter, e.g. `make fmtcheck`, `npm run format:check`, `cargo fmt --check`)
+- the linter
+- the test suite
 
 If ANY gate is red, do NOT dispatch the reviewers. Articulate the failures to the Implementer via SendMessage (create one shared task item per failure), and WAIT for the Implementer to signal a green re-verify before dispatching the three reviewer subagents. This preserves the base skill's "a red gate blocks reviewer dispatch" invariant -- there is no point reviewing a broken branch.
 
@@ -91,7 +107,7 @@ If ANY gate is red, do NOT dispatch the reviewers. Articulate the failures to th
 
 **3. Dispatch the three fresh reviewer subagents UNCHANGED.** Dispatch the security, quality, and standards reviewers exactly as written in step 2 above, over the branch diff. Because teammates cannot spawn teammates, these MUST be classic Agent-tool subagents (not team members) -- which is exactly what the base skill already uses, so fresh-context review is preserved.
 
-**4. Triage, then ARTICULATE each Fix (do not apply it).** Triage per step 3 (Fix / Reject / Defer). For each **Fix** finding: create ONE shared task-list item and SendMessage the Implementer the precise change (file:line, what to change, why, and the rule cited). Do NOT edit. The Implementer claims the task, applies the fix, re-runs the writing gates to green, commits it (fixup+autosquash where the fix maps cleanly to one existing commit, else a conventional commit), and signals `commit <sha> complete, tree quiesced`, then WAITS.
+**4. Triage, then ARTICULATE each Fix (do not apply it).** Triage per step 3 (Fix / Reject / Defer). For each **Fix** finding: create ONE shared task-list item and SendMessage the Implementer the precise change (file:line, what to change, why, and the rule cited). Do NOT edit. The Implementer claims the task, applies the fix, re-runs the project's format/lint/test gates to green, commits it (fixup+autosquash where the fix maps cleanly to one existing commit, else a conventional commit), and signals `commit <sha> complete, tree quiesced`, then WAITS.
 - **Reject:** record the reason (one line) in the disposition table; do not create a task.
 - **Defer:** SendMessage the Implementer to add a TODO comment citing the finding; record it as deferred.
 
@@ -105,45 +121,46 @@ If ANY gate is red, do NOT dispatch the reviewers. Articulate the failures to th
 
 ## Reviewer Rubrics
 
+> **Adapting the rubrics to your project:** The categories below are universal, but the concrete rule for each lives in the project's conventions doc and codebase. Before dispatching, skim the conventions doc and note the project's specifics (auth mechanism and where routes register it, whether it is multi-tenant, its data-access/ORM layer, logging API, doc-sync/codegen requirements, commit-message format). Feed those specifics to the reviewers alongside the category, and cite codebase precedent (the file/function where the existing pattern lives) when the rule is architecture-derived rather than written down. Skip any category the project does not have (e.g., no multi-tenancy, no CLI, no encryption-at-rest). Examples in each bullet are illustrative — replace them with the project's actual API names, paths, and file references.
+
 ### Security Reviewer
 
-You are reviewing a branch diff for security defects. Read CLAUDE.md first. Examine every new/changed file in the diff against these rules:
+You are reviewing a branch diff for security defects. Read the project's conventions doc first. Examine every new/changed file in the diff against these categories:
 
-- **Auth on every new route (both main + internal):** Every route must specify its auth mechanism. Main-server routes use JWT/API-key auth. Internal-server routes MUST be in the `protectedMethods` map for `ApiKeyUnaryInterceptor`. This is architecture-derived: cite codebase precedent at `pkg/auth/middleware/middleware.go` (`ApiKeyProtectedMethods()` and `ApiKeyUnaryInterceptor`) and `pkg/rpcServer/internalServer.go` where existing internal routes are registered. If a new route is added without auth configuration, that is HIGH.
-- **Auth TEST coverage for new routes:** It is not enough that a route has auth configured -- there must be a TEST that proves unauthenticated/wrong-key requests are rejected. Specifically: if a new internal-server route is added, check whether any test file verifies that calling the route WITHOUT the API key (or with a wrong key) returns Unauthenticated. The interceptor unit test (`middleware_test.go`) proves the interceptor works generically, but there must ALSO be a test proving the route is actually IN the protected map. If no such test exists, that is HIGH.
-- **Tenant isolation on every query + cross-tenant TEST:** Every data-access method that takes a resource ID must scope by tenant (org/account). Additionally, there MUST be a test that attempts cross-tenant access and verifies it is rejected for EVERY endpoint (not just some). If the handler test covers Set/List/Delete cross-tenant but NOT Get, that is a gap. Check every RPC method individually. If any endpoint scopes by tenant but has no cross-tenant rejection test, that is HIGH.
-- **SQL injection (no raw SQL from user input):** Examine every raw SQL construction in the diff. Query text must NEVER be built by string concatenation or `fmt.Sprintf` with user-supplied values, and `gorm.Raw`/`Exec` calls must use `?` placeholder binding for every dynamic value -- never interpolation. Codebase precedent: the models layer uses GORM with parameterized queries and subqueries (e.g., `WHERE status_id = (SELECT id FROM release_status WHERE name = ?)` per CLAUDE.md's "Enum Lookup Tables" pattern). Any deviation from placeholder binding where a user-controllable value reaches query text is HIGH. Table/column names built from variables are also HIGH unless validated against a hardcoded allowlist.
-- **Unvalidated proto fields:** Every field of a new/changed proto request message must be validated before use: required-field presence (non-empty IDs), format/length checks (codebase precedent: `secretsService.ValidateName` -- regex + length limit applied at the top of the handler), and enum/range checks for numeric or enum fields. Check every handler in the diff: a handler that passes `req` fields straight to service/model calls without validation is a finding. Severity by sink: HIGH if the unvalidated field reaches a query, crypto operation, or filesystem/exec path; MEDIUM otherwise.
-- **No secrets/keys in logs:** No code may log a full request/response object (they carry auth context). Logging must use specific named fields only. If code logs `"request", req` or similar full-object serialization, that is HIGH.
-- **Race conditions in concurrent paths:** Any read-then-write pattern (SELECT then INSERT/UPDATE) without proper locking or conflict handling is HIGH. Specifically examine every "upsert" or "get-or-create" function: if it does SELECT first and then INSERT on not-found, two concurrent calls for the same key BOTH get "not found" (no row exists to lock), BOTH attempt INSERT, and one hits the unique constraint. If the duplicate-key error is not caught and retried (or ON CONFLICT is not used), this is an unhandled 500 in production. Also look for: map access without mutex in goroutines, shared state modified in parallel loops. Every model method that does SELECT-then-INSERT must be checked for this pattern.
-- **Encryption/crypto hygiene:** Ciphertext output MUST include a version/algorithm identifier byte so encryption can be rotated without breaking existing data. Hardcoded dev/test keys MUST always produce a visible warning (not gated behind --verbose or debug flags). If either is missing, that is HIGH.
-- **Input validation + size caps:** All user-supplied input (stdin, file reads, request fields) must have size limits. Unbounded reads (io.ReadAll without LimitReader) are MEDIUM. Missing client-side validation that forces a round-trip to the server for rejection is MEDIUM.
-- **Metadata-only reads (check the FULL data path, not just the wire):** User-facing list/get endpoints for sensitive resources (secrets, keys, credentials) should return metadata only (names, timestamps, IDs) -- not the actual secret values. The full value should require a separate explicit retrieval path or be internal-only. If a user-facing RPC returns secret values in its standard response, that is HIGH. CRITICALLY: it is NOT enough that the response proto omits the value -- trace the query all the way to the database. If the handler's service/model call SELECTs or loads the sensitive column (e.g., a GORM `Find` on the full model struct including the encrypted value) on a path that only needs metadata, that is a least-privilege violation: the value transits the DB connection, driver buffers, and process memory for no reason. Metadata endpoints must use metadata-only queries (explicit column selection omitting the sensitive column). Codebase precedent: commit 66206cb added `ListSecretMetadata`/`GetSecretMetadata` service methods backed by metadata-only model queries because the user-facing read paths were loading full rows including the encrypted value. Flag as HIGH.
+- **Auth on every new route/endpoint:** Every route must specify its auth mechanism. If the project has more than one server surface (e.g., a public API and an internal service), each has its own auth requirement — find where routes register their auth (an interceptor/middleware allowlist, a decorator, a route guard) and confirm the new route is covered. This is often architecture-derived: cite the codebase precedent (the file where existing routes register auth) rather than a doc quote. If a new route is added without auth configuration, that is HIGH.
+- **Auth TEST coverage for new routes:** It is not enough that a route has auth configured — there must be a TEST that proves unauthenticated/wrong-credential requests are rejected. A generic interceptor/middleware unit test proves the mechanism works, but there must ALSO be a test proving the specific new route is actually protected. If no such test exists, that is HIGH.
+- **Tenant/owner isolation on every query + cross-tenant TEST (if multi-tenant):** Every data-access method that takes a resource ID must scope by tenant (org/account/user). Additionally, there MUST be a test that attempts cross-tenant access and verifies it is rejected for EVERY endpoint (not just some). If the tests cover create/list/delete cross-tenant but NOT get, that is a gap. Check every method individually. If any endpoint scopes by tenant but has no cross-tenant rejection test, that is HIGH.
+- **Injection (no raw queries/commands from user input):** Examine every raw query or command construction in the diff. Query/command text must NEVER be built by string concatenation or interpolation with user-supplied values — use parameterized/placeholder binding for every dynamic value. Any deviation where a user-controllable value reaches query/command text is HIGH. Identifiers (table/column/path names) built from variables are also HIGH unless validated against a hardcoded allowlist.
+- **Unvalidated request fields:** Every field of a new/changed request message must be validated before use: required-field presence (non-empty IDs), format/length checks, and enum/range checks for numeric or enum fields. A handler that passes request fields straight to service/data-layer/exec calls without validation is a finding. Severity by sink: HIGH if the unvalidated field reaches a query, crypto operation, or filesystem/exec path; MEDIUM otherwise.
+- **No secrets/keys in logs:** No code may log a full request/response object (they carry auth context). Logging must use specific named fields only. If code logs a whole request/response object or similar full-object serialization, that is HIGH.
+- **Race conditions in concurrent paths:** Any read-then-write pattern (read then insert/update) without proper locking or conflict handling is HIGH. Specifically examine every "upsert" or "get-or-create" function: if it reads first and then inserts on not-found, two concurrent calls for the same key BOTH see "not found", BOTH attempt insert, and one hits the unique constraint. If the duplicate-key error is not caught and retried (or an atomic upsert / ON CONFLICT is not used), this is an unhandled error in production. Also look for: shared map/state access without synchronization across concurrent tasks. Every method that does read-then-insert must be checked for this pattern.
+- **Encryption/crypto hygiene (if the diff handles encryption):** Ciphertext output MUST include a version/algorithm identifier so encryption can be rotated without breaking existing data. Hardcoded dev/test keys MUST always produce a visible warning (not gated behind a verbose/debug flag). If either is missing, that is HIGH.
+- **Input validation + size caps:** All user-supplied input (stdin, file reads, request fields) must have size limits. Unbounded reads (reading an entire stream without a limit) are MEDIUM. Missing client-side validation that forces a round-trip to the server for rejection is MEDIUM.
+- **Metadata-only reads (check the FULL data path, not just the wire):** User-facing list/get endpoints for sensitive resources (secrets, keys, credentials) should return metadata only (names, timestamps, IDs) — not the actual sensitive values. The full value should require a separate explicit retrieval path or be internal-only. If a user-facing endpoint returns sensitive values in its standard response, that is HIGH. CRITICALLY: it is NOT enough that the response type omits the value — trace the query all the way to the data store. If the handler's service/data-layer call loads the sensitive column/field (e.g., loading the full record including the encrypted value) on a path that only needs metadata, that is a least-privilege violation: the value transits the connection, driver buffers, and process memory for no reason. Metadata endpoints must use metadata-only queries (explicit field selection omitting the sensitive column). Flag as HIGH.
 
 ### Quality Reviewer
 
-You are reviewing a branch diff for quality defects. Read CLAUDE.md first. Examine every new/changed file against these rules:
+You are reviewing a branch diff for quality defects. Read the project's conventions doc first. Examine every new/changed file against these rules:
 
-- **Test coverage for every new function:** Every new exported function, method, or handler must have a corresponding test. Validation/parsing functions (e.g., `ValidateName`, `decodeKey`, dotenv parsing) MUST have dedicated unit tests -- integration tests alone are insufficient. Missing tests are MEDIUM.
-- **Cross-tenant rejection test:** If the diff adds data-access methods scoped by tenant, there must be a test that specifically attempts access with a different tenant's credentials and asserts rejection. Missing cross-tenant tests are HIGH.
-- **Error path completeness:** Every operation that can fail must handle the error explicitly. Silent drops (`_ = err`) or missing error returns are HIGH.
-- **Non-deterministic behavior:** Code that iterates Go maps and produces user-visible output (error messages, logs, API responses) has non-deterministic ordering. If bulk operations process items from a map and report partial failures, the error messages will be non-reproducible. Flag non-deterministic user-facing output as MEDIUM.
-- **Log noise from handled errors:** If code catches and retries an error (e.g., a duplicate-key conflict in an upsert), it should NOT also log the error at ERROR/WARN level -- that creates confusing noise for operators who see errors that were actually handled. Specifically: if an upsert function logs an error when the initial SELECT or INSERT fails, but then retries or falls through to an alternate path, the first-attempt log is noise. Check every error log in upsert/retry paths. Flag as LOW.
-- **Client-side validation:** If the server validates input (name format, value length, etc.), the CLI client should perform the same validation locally before making the RPC call, for immediate user feedback. Missing client-side validation is MEDIUM.
+- **Test coverage for every new function:** Every new exported function, method, or handler must have a corresponding test. Validation/parsing functions MUST have dedicated unit tests — integration tests alone are insufficient. Missing tests are MEDIUM.
+- **Cross-tenant rejection test (if multi-tenant):** If the diff adds data-access methods scoped by tenant, there must be a test that specifically attempts access with a different tenant's credentials and asserts rejection. Missing cross-tenant tests are HIGH.
+- **Error path completeness:** Every operation that can fail must handle the error explicitly. Silent drops (ignoring/swallowing an error) or missing error returns are HIGH.
+- **Non-deterministic behavior:** Code that iterates an unordered collection (e.g., a hash map) and produces user-visible output (error messages, logs, API responses) has non-deterministic ordering. If bulk operations process items from such a collection and report partial failures, the messages will be non-reproducible. Flag non-deterministic user-facing output as MEDIUM.
+- **Log noise from handled errors:** If code catches and retries an error (e.g., a duplicate-key conflict in an upsert), it should NOT also log the error at ERROR/WARN level — that creates confusing noise for operators who see errors that were actually handled. Check every error log in upsert/retry paths. Flag as LOW.
+- **Client-side validation:** If the server validates input (name format, value length, etc.), a client (CLI/SDK/UI) should perform the same validation locally before the round-trip, for immediate user feedback. Missing client-side validation is MEDIUM.
 
 ### Standards Reviewer
 
-You are reviewing a branch diff for violations of project conventions documented in CLAUDE.md. Read CLAUDE.md first. For every finding, quote the specific CLAUDE.md section title and rule text that is violated. Check:
+You are reviewing a branch diff for violations of the project's documented conventions. Read the project's conventions doc first. For every finding, quote the specific section title and rule text that is violated. The categories below are the ones project conventions most commonly govern — check each against what the conventions doc actually says, and skip any the project has no rule for:
 
-- **Protobuf-only routes (CLAUDE.md: "Protobuf & gRPC"):** "All HTTP and gRPC routes must be defined as protobuf services with `google.api.http` annotations -- never add hand-written HTTP handlers directly to the server." If the diff adds `mux.HandleFunc(...)` or a direct HTTP handler, that is HIGH.
-- **Enum Lookup Tables (CLAUDE.md: "Enum Lookup Tables"):** "Status fields and other categorical values use lookup tables instead of raw TEXT columns." If a migration adds a TEXT/VARCHAR column for a status/type/category field, that is HIGH.
-- **Minimal GORM tags (CLAUDE.md: "GORM struct tags"):** "Keep `gorm:` tags minimal." Only `primaryKey`, `default:uuid_generate_v1()`, and `autoIncrement` are permitted. Any other tag is a finding.
-- **Migration registered in GetMigrations() (CLAUDE.md: "Adding Migrations"):** Every new migration must be registered in `pkg/postgres/migrations/migrations.go:GetMigrations()`.
-- **CLI doc-sync (CLAUDE.md: "Bundled agent skill" + "User-facing documentation"):** "After adding or changing any CLI command or flag, run `make skill` and commit the result." ALSO: CLI changes must update `ecloud-ui/src/content/docs/cli.md` AND `ecloud-cli/README.md`. If new CLI commands exist without ALL THREE being updated, that is HIGH.
-- **Sugared-logger convention (CLAUDE.md: "Logging"):** "Always use `logger.Sugar()` with the `w`-suffixed methods (`Debugw`, `Infow`, `Warnw`, `Errorw`) and pass key-value pairs -- never use `zap.Field` helpers (e.g., `zap.String`, `zap.Uint64`) with the sugared logger." If new code uses `zap.Error()`, `zap.String()`, or the non-sugared logger, that is MEDIUM.
-- **Conventional commits (CLAUDE.md: "Commit messages"):** "Do NOT add `Co-Authored-By` or any other trailers to commit messages." Check commit messages in the branch for trailer violations.
-- **`make skill` drift:** If the diff adds/modifies CLI commands or flags, verify that the generated skill file (`ecloud-cli/cmd/skill/assets/SKILL.md`) was regenerated. If the diff includes CLI changes but no corresponding skill-file update, that is HIGH.
-- **golangci-lint clean:** Run `make lint` (or `golangci-lint run ./...`) against the diff scope. Any findings (unused variables, ineffectual assignments, shadow declarations, etc.) are MEDIUM. The linter is the first mechanical gate and MUST pass before push.
+- **Routing/handler convention:** If the project mandates one way to define routes (e.g., IDL/protobuf-defined services, a specific router, a codegen step) and forbids hand-written handlers that bypass it, flag any diff that adds a bypassing handler. HIGH when the doc states such a rule.
+- **Schema/enum conventions:** If the project constrains how categorical/status values and columns are modeled (e.g., lookup tables vs. raw enum columns, permitted column types), flag migrations/models that deviate.
+- **ORM/model tag conventions:** If the conventions doc restricts which ORM/serialization struct tags are permitted, flag any tag outside the allowed set.
+- **Migration registration:** If new migrations must be registered in a central list/registry, flag any migration not registered there.
+- **Doc-sync / codegen drift:** If changing a CLI command, API, or public interface requires updating specific docs AND/OR running a generation command (with CI failing on drift), flag a diff that changes those without updating ALL required targets and regenerating. Enumerate every target from the conventions doc; a partial update is HIGH.
+- **Logging convention:** If the diff uses a logging API/style other than the project's documented one, flag it (severity per the doc's emphasis; typically MEDIUM).
+- **Commit-message convention:** Check the branch's commit messages against the project's format (e.g., conventional commits; trailer restrictions such as no `Co-Authored-By`). Flag violations.
+- **Linter clean:** Run the project's linter against the diff scope. Any findings (unused variables, ineffectual assignments, shadowing, etc.) are MEDIUM. The linter is the first mechanical gate and MUST pass before push.
 
 ## Red Flags (from baseline failure modes)
 
@@ -151,8 +168,8 @@ These are rationalization patterns observed in baseline reviews. If you catch yo
 
 1. **"The implementation looks correct, so no test is needed."** WRONG. Correct implementations still need tests that prove the correctness and prevent regressions. Missing tests are always a finding.
 2. **"Tenant isolation is implemented correctly, so cross-tenant access is fine."** WRONG. Implementation correctness and test coverage are independent concerns. A cross-tenant rejection test MUST exist even if the implementation looks solid.
-3. **"The diff is too large to review fully."** WRONG. Chunk by package and review each chunk. Never skip files due to diff size.
+3. **"The diff is too large to review fully."** WRONG. Chunk by directory/package and review each chunk. Never skip files due to diff size.
 4. **"This data isn't sensitive, so auth/security is lower priority."** WRONG. Auth requirements are structural and apply regardless of data sensitivity. Every route needs auth; no exceptions.
 5. **"Tests pass, so the code is fine."** WRONG. Tests passing proves the happy path works. It does not prove security boundaries hold, error paths are handled, or conventions are followed.
 6. **"The values are encrypted, so returning them to users is safe."** WRONG. User-facing list/get endpoints should return metadata only. Even encrypted values should not be exposed in standard responses if the design can separate metadata reads from value retrieval.
-7. **"The response proto omits the value, so the metadata-only requirement is satisfied."** WRONG. Check what the query LOADS, not just what the response SENDS. A handler that maps to a metadata-only proto but whose service call fetches full rows (including the sensitive column) from the database still violates least-privilege data fetch. Trace handler -> service -> model -> SQL.
+7. **"The response type omits the value, so the metadata-only requirement is satisfied."** WRONG. Check what the query LOADS, not just what the response SENDS. A handler that maps to a metadata-only response type but whose service call fetches full records (including the sensitive column) from the data store still violates least-privilege data fetch. Trace the full path: handler -> service -> data layer -> query.
