@@ -17,11 +17,19 @@ This skill orchestrates a five-stage pipeline that takes a feature from idea (or
 
 ## Right-Sizing: scale the ceremony to the change
 
-The five stages and the ONE human gate are invariant — every run passes through all five and stops at the gate. What scales is the *weight* of stages 2–4: a three-file bugfix does not need the same review fan-out and subagent relay as a new subsystem. Classify the change at the START of stage 1 (record the class and one-line reason in Pipeline State) and apply the matching column below. When unsure which class, pick the heavier one.
+The five stages and the ONE human gate are invariant — every run passes through all five and stops at the gate. What scales is the *weight* of stages 2–4: a mechanical, interface-preserving change does not need the same review fan-out and subagent relay as a new subsystem or a behavioral change. Classify the change at the START of stage 1 (record the class and one-line reason in Pipeline State) and apply the matching column below. When unsure which class, pick the heavier one.
+
+**Classify by risk, not file count.** File count is a bad proxy: renaming a config variable across 12 files is trivial, while reimplementing one file's internals is not. Score the change on three dimensions and take the *highest* it triggers:
+
+- **New surface** — does it add a dependency, DB table/migration, public API/route, config var, or subsystem? (adds surface → at least Standard; new subsystem/schema/cross-repo contract → Large)
+- **Risky boundary** — does it touch auth/authz, payments/money, data integrity, concurrency, migrations, or a security-relevant path? (yes → at least Standard, usually Large regardless of size)
+- **Mechanical vs. semantic** — does correctness follow from a *uniform, interface-preserving* edit (rename, move, signature-preserving refactor, adding a flag that defaults off), or does it require *per-site reasoning about new behavior*? Mechanical → Small even across many files; semantic/behavioral → Standard+ even in one file.
+
+File count is at most a weak tiebreaker within a dimension, never the trigger itself.
 
 | | **Small** | **Standard** | **Large** |
 |---|---|---|---|
-| **Trigger** | ≤ ~5 files, no new dependency/table/subsystem/public-API surface, no cross-repo change | anything not Small or Large | new subsystem, schema/migration, security boundary, cross-repo contract, or > ~20 files |
+| **Trigger** | mechanical / interface-preserving, adds no surface, touches no risky boundary — regardless of file count (e.g. rename a var across N files, move code, signature-preserving refactor, default-off flag) | adds surface OR is semantic/behavioral OR touches a risky boundary in a contained way — but no new subsystem/schema/cross-repo contract | new subsystem, schema/migration, security or money boundary, cross-repo contract, or a semantic change whose blast radius spans many consumers |
 | **Stage 1 brainstorm** | premise check (below) + confirm approach in-line; skip multi-question ceremony if the answers are already clear | full brainstorming | full brainstorming + decompose if needed |
 | **Stage 1 plan** | lightweight plan (still house-style, but tasks may be coarse) | full plan | full plan |
 | **Stage 2 review** | ONE reviewer pass (combined dimensions), unless the premise check flags risk | three-dimension `reviewing-plans` | three-dimension `reviewing-plans` |
@@ -98,7 +106,7 @@ digraph pipeline {
 
 ### Stage 3: Implementation
 
-1. Execute the plan per the Right-Sizing class: **Standard/Large** invoke `superpowers:subagent-driven-development` (fresh subagent per task, or batching only trivial tasks); **Small** execute inline with `superpowers:executing-plans` — do NOT run the per-task implementer→reviewer subagent relay for a handful of files, it adds context-rebuild overhead without catching more. Either way, follow TDD and the plan's checkbox tasks.
+1. Execute the plan per the Right-Sizing class: **Standard/Large** invoke `superpowers:subagent-driven-development` (fresh subagent per task, or batching only trivial tasks); **Small** execute inline with `superpowers:executing-plans` — do NOT run the per-task implementer→reviewer subagent relay for a mechanical, interface-preserving change, it adds context-rebuild overhead without catching more. Either way, follow TDD and the plan's checkbox tasks.
 2. Update Pipeline State after completion.
 
 ### Stage 4: Commit Review
@@ -127,7 +135,7 @@ After each stage transition, update a `## Pipeline State` block in the plan docu
 | Field   | Value                          |
 |---------|--------------------------------|
 | stage   | 3 (implementation)             |
-| class   | small (3 files, no new subsystem) |
+| class   | small (mechanical rename, no new surface) |
 | branch  | feat/<topic>                   |
 | pr      | #<n>                           |
 | round   | 0                              |
