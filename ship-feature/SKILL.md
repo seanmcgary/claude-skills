@@ -9,11 +9,26 @@ This skill orchestrates a five-stage pipeline that takes a feature from idea (or
 
 **Stages:**
 
-1. **Spec + Plan** -- brainstorm the design, then produce an implementation plan in house style.
-2. **Plan Review** -- three-dimension review of the plan; present it to the human for approval.
-3. **Implementation** -- execute the plan task-by-task via subagent-driven development.
+1. **Spec + Plan** -- verify the premise, brainstorm the design, then produce an implementation plan in house style.
+2. **Plan Review** -- review of the plan; present it to the human for approval.
+3. **Implementation** -- execute the plan; task-by-task via subagents, or inline for small changes.
 4. **Commit Review** -- security/quality/standards review of the branch diff before push.
 5. **PR Feedback Loop** -- push, open PR, address reviewer feedback for up to N rounds (default 3).
+
+## Right-Sizing: scale the ceremony to the change
+
+The five stages and the ONE human gate are invariant — every run passes through all five and stops at the gate. What scales is the *weight* of stages 2–4: a three-file bugfix does not need the same review fan-out and subagent relay as a new subsystem. Classify the change at the START of stage 1 (record the class and one-line reason in Pipeline State) and apply the matching column below. When unsure which class, pick the heavier one.
+
+| | **Small** | **Standard** | **Large** |
+|---|---|---|---|
+| **Trigger** | ≤ ~5 files, no new dependency/table/subsystem/public-API surface, no cross-repo change | anything not Small or Large | new subsystem, schema/migration, security boundary, cross-repo contract, or > ~20 files |
+| **Stage 1 brainstorm** | premise check (below) + confirm approach in-line; skip multi-question ceremony if the answers are already clear | full brainstorming | full brainstorming + decompose if needed |
+| **Stage 1 plan** | lightweight plan (still house-style, but tasks may be coarse) | full plan | full plan |
+| **Stage 2 review** | ONE reviewer pass (combined dimensions), unless the premise check flags risk | three-dimension `reviewing-plans` | three-dimension `reviewing-plans` |
+| **Stage 3** | inline execution (`superpowers:executing-plans`), no per-task subagent relay | subagent-driven, batch trivial tasks | subagent-driven, one task per subagent |
+| **Stage 4** | rely on the PR bot as the review pass; run mechanical gates + a single self-review, skip the 3-reviewer `reviewing-commits` fan-out | full `reviewing-commits` | full `reviewing-commits` |
+
+**Do not stack redundant review layers.** Stage 4 commit-review, any stage-3 whole-branch review, and the stage-5 PR bot largely overlap in scope. Run the full 3-reviewer fan-out **once** per run at the heaviest-justified point, not at every stage. For Small changes that point is the PR bot; for Standard/Large it is stage 4.
 
 ## Stage Sequence
 
@@ -50,7 +65,15 @@ digraph pipeline {
 
 **Skip condition:** If the user provides a path to an already-approved spec or plan with a `## Pipeline State` block showing stage >= 2, skip to the indicated stage (see Resume below).
 
-1. Invoke `superpowers:brainstorming` to explore design space, requirements, and edge cases. If a written spec already exists (user provides path or one exists at `docs/superpowers/specs/`), skip brainstorming and proceed directly to the plan.
+0. **Premise & blast-radius check (do this FIRST, by reading code — not assumption).** Before brainstorming design *details*, verify the design *premise*: the facts the whole change rests on. A plan built on a wrong premise passes every downstream review — three fresh reviewers will all bless a correct-looking implementation of the wrong thing, because the error is baked equally into the plan and the spec. Review layers cannot catch a shared blind spot; only checking reality up front can. Concretely, answer each of these by grepping/reading, and record the findings (with `file:line` evidence) in the spec:
+   - **Entry path — how is the thing I'm changing actually reached?** Who calls this endpoint/function/flag? Is there a proxy, gateway, BFF, or other indirection in front of it? (For a public/agent-facing surface: trace the real request path end-to-end, across repos.)
+   - **Blast radius — what else lives on this path?** Enumerate every repo, service, and surface the change touches or that consumes its output. If the answer includes another repo, that repo is IN SCOPE for this run, not a follow-up.
+   - **Existing prior art — is there a config/pattern/host I should reuse instead of inventing one?** Search for an existing variable/route/convention before adding a new one.
+   - **Contradiction scan — does anything I just read contradict the user's framing or my assumption?** If the user names a URL, host, or component, verify it against the code before building on it. Surface any mismatch to the user NOW, not after the PR is open.
+
+   If any answer is unknown after a reasonable search, that is itself a finding to surface — do not paper over it with a plausible guess. This step is cheap (minutes of grep) and is the single highest-leverage defense against a full rework.
+
+1. Invoke `superpowers:brainstorming` to explore design space, requirements, and edge cases, informed by the step-0 findings. If a written spec already exists (user provides path or one exists at `docs/superpowers/specs/`), skip brainstorming and proceed directly to the plan — but still run the step-0 premise check against that spec. For a **Small** change (see Right-Sizing) whose premise check is clean and whose approach is unambiguous, keep brainstorming lightweight: confirm the approach in one exchange rather than running the full one-question-at-a-time ceremony.
 2. Invoke `superpowers:writing-plans` to produce the implementation plan, layering the following **house plan style** on top of whatever that skill produces:
 
    **House plan style requirements (all four MUST be present):**
@@ -65,7 +88,7 @@ digraph pipeline {
 
 ### Stage 2: Plan Review + Human Gate
 
-1. Invoke `reviewing-plans` on the plan document (the three-dimension review: security, quality, standards).
+1. Review the plan per the Right-Sizing class: **Standard/Large** invoke `reviewing-plans` (three-dimension: security, quality, standards); **Small** run a single combined-dimension review pass (self-review against the same rubric, or one reviewer subagent) unless the step-0 premise check flagged risk, in which case escalate to the full `reviewing-plans`. Either way, a review of some weight always runs before the gate.
 2. Apply fixes from the review to the plan inline.
 3. **THE GATE:** Present the reviewed plan to the human. State explicitly:
 
@@ -75,12 +98,14 @@ digraph pipeline {
 
 ### Stage 3: Implementation
 
-1. Invoke `superpowers:subagent-driven-development` with the plan path. The plan's checkbox tasks and agentic-worker header guide execution.
+1. Execute the plan per the Right-Sizing class: **Standard/Large** invoke `superpowers:subagent-driven-development` (fresh subagent per task, or batching only trivial tasks); **Small** execute inline with `superpowers:executing-plans` — do NOT run the per-task implementer→reviewer subagent relay for a handful of files, it adds context-rebuild overhead without catching more. Either way, follow TDD and the plan's checkbox tasks.
 2. Update Pipeline State after completion.
 
 ### Stage 4: Commit Review
 
-1. Invoke `reviewing-commits` on the feature branch. This runs the project's mechanical gates (format, lint, test) then dispatches three parallel reviewers (security, quality, standards) over the branch diff, triages findings, applies fixes as commits, and re-runs gates.
+1. Run the pre-push review per the Right-Sizing class, and run the full 3-reviewer fan-out only ONCE per pipeline (see "Do not stack redundant review layers"):
+   - **Standard/Large:** invoke `reviewing-commits` on the feature branch — mechanical gates (format, lint, test) then three parallel reviewers (security, quality, standards) over the branch diff, triage, fix as commits, re-run gates. If `subagent-driven-development` in stage 3 already ran a whole-branch review, do not duplicate it here — run gates + fix its deferred findings instead.
+   - **Small:** run the project's mechanical gates + a single self-review against the reviewing-commits rubric, then rely on the stage-5 PR bot as the review pass. Skip the 3-reviewer fan-out.
 2. Update Pipeline State after completion.
 
 ### Stage 5: PR Feedback Loop
@@ -89,6 +114,8 @@ digraph pipeline {
 2. Invoke `pr-feedback-loop` with N=3 (default). This waits for the bot review, triages findings, applies fixes, replies to threads, and repeats for up to N rounds.
 3. Update Pipeline State after each round.
 4. When the loop terminates (clean round or cap reached), produce the final status report.
+
+**Do not block on slow CI for a clean-round exit.** The bot review that drives the feedback loop is what you wait for; long-running CI jobs (full test suites, container builds) are not. Once the loop reaches a clean round and local mechanical gates already passed in stage 4, report completion and note CI as "in progress — will report if it fails" rather than sitting in a blocking poll for multi-minute jobs. Only wait synchronously on CI when a check is *required for the exit decision* (e.g. a branch-freshness gate you must resolve, or a red check that changes your triage). Prefer backgrounding long waits over serial `sleep` loops.
 
 ## Pipeline State
 
@@ -100,6 +127,7 @@ After each stage transition, update a `## Pipeline State` block in the plan docu
 | Field   | Value                          |
 |---------|--------------------------------|
 | stage   | 3 (implementation)             |
+| class   | small (3 files, no new subsystem) |
 | branch  | feat/<topic>                   |
 | pr      | #<n>                           |
 | round   | 0                              |
@@ -107,6 +135,7 @@ After each stage transition, update a `## Pipeline State` block in the plan docu
 
 **Fields:**
 - `stage` -- current stage number and name (e.g., `1 (spec + plan)`, `2 (plan review)`, `3 (implementation)`, `4 (commit review)`, `5 (pr feedback loop)`)
+- `class` -- the Right-Sizing class (`small` / `standard` / `large`) plus a one-line reason, set at stage 1 start. Drives the weight of stages 2–4.
 - `branch` -- the feature branch name (set at stage 3 start)
 - `pr` -- the PR number (set when opened in stage 5; `n/a` before)
 - `round` -- current feedback round within stage 5 (0 before stage 5)
@@ -232,7 +261,11 @@ Each teammate auto-loads ship-feature; every spawn prompt therefore names the si
 
 These are rationalization patterns from baseline runs. If you catch yourself thinking any of these, STOP -- you are about to violate the pipeline:
 
-1. **"The plan is simple enough to skip review."** WRONG. Every plan gets the three-dimension review regardless of apparent simplicity. A one-flag CLI change still touches conventions (doc-sync, skill generation, test coverage) that only structured review catches.
+1. **"The plan is simple enough to skip review."** WRONG. Every plan gets a review before the gate, regardless of apparent simplicity — a one-flag CLI change still touches conventions (doc-sync, skill generation, test coverage) that only structured review catches. Right-Sizing scales the *weight* of that review (a Small change gets one combined pass instead of three), but it never scales the review to *zero*, and it never removes the human gate. "Skip" and "right-size" are different: you may right-size, you may never skip.
+
+6. **"This is a small change, so I can skip the premise check."** WRONG — backwards. The premise check (stage 1 step 0) is MOST valuable on changes that look small, because a small-looking change built on a wrong assumption (wrong host, unseen proxy, wrong entry path) produces a fast, confident, and completely wrong PR that every review layer then blesses. Minutes of grep up front beats a full rework. Never skip it.
+
+7. **"I'll wait for CI to be fully green before reporting."** WRONG for a clean-round exit. Wait for the *bot review* (it drives the loop) and for any check *required for the exit decision*; do not sit in a blocking poll for multi-minute test/build jobs when local gates already passed. Report completion and flag CI as in-progress. (See Stage 5.)
 
 2. **"I'll just ask the user to be safe."** WRONG. After the gate is approved, you proceed autonomously. The three exceptions above are the ONLY reasons to stop. Mid-pipeline permission-asking breaks flow and signals uncertainty that should have been resolved in planning.
 
