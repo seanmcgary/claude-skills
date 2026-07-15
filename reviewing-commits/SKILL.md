@@ -92,7 +92,7 @@ Output the final table:
 
 You are a teammate, not the lead. You never spawn teammates (teammates cannot). You never orchestrate the pipeline or advance it past stage 4. Ignore `ship-feature`'s `## Team Mode` section -- it is a lead-only orchestration script.
 
-**Core rule: QA reviews READ-ONLY and articulates; the Implementer applies and commits.** You NEVER edit code, never run the writing gates, never commit. File ownership: the Implementer (model `claude-opus-4-8[1m]`) writes all source and all local commits; QA writes NO files.
+**Core rule: QA reviews READ-ONLY and articulates; the Implementer applies and commits.** You NEVER edit code, never run the writing gates, never commit. File ownership: the Implementer (model `claude-sonnet-5`) writes all source and all local commits; QA writes NO files.
 
 The following are SUSPENDED for you: the Mechanical Gates' commit actions ("if any files change, commit them", "fix them and commit"), Process **step 4 (Fold fixes into the branch)**, and Process **step 5 (Re-run the three gates)** as commits. You do the read-only equivalents below instead.
 
@@ -122,6 +122,8 @@ If ANY gate is red, do NOT dispatch the reviewers. Articulate the failures to th
 ## Reviewer Rubrics
 
 > **Adapting the rubrics to your project:** The categories below are universal, but the concrete rule for each lives in the project's conventions doc and codebase. Before dispatching, skim the conventions doc and note the project's specifics (auth mechanism and where routes register it, whether it is multi-tenant, its data-access/ORM layer, logging API, doc-sync/codegen requirements, commit-message format). Feed those specifics to the reviewers alongside the category, and cite codebase precedent (the file/function where the existing pattern lives) when the rule is architecture-derived rather than written down. Skip any category the project does not have (e.g., no multi-tenancy, no CLI, no encryption-at-rest). Examples in each bullet are illustrative — replace them with the project's actual API names, paths, and file references.
+
+> **Profile-driven dimensions (when invoked by ship-feature):** If a ship-feature domain **profile** is active (`ship-feature/profiles/*.md`), its reviewer slice is the source of truth for *which* dimensions to run. The three rubrics below are the `backend` profile. The `frontend` profile substitutes accessibility / responsive / design-fidelity / client-security for the Security rubric and keeps Quality + Standards; full-stack runs both sets plus the seam's contract-consistency / error-propagation / validation-parity checks. Read the active profile and dispatch one fresh reviewer per dimension it names (group related dimensions into a single reviewer where sensible — the "three parallel reviewers" count is a default, not a fixed set); keep each reviewer fresh-context and single-focus.
 
 ### Security Reviewer
 

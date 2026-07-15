@@ -71,6 +71,8 @@ Follow the Process above with these modifications:
 
 > **Adapting the rubrics to your project:** The categories below are universal, but the concrete rule for each category lives in the project's conventions doc and codebase. Before dispatching, skim the conventions doc and note the project's specifics (its routing/handler convention, auth mechanism, ORM/schema conventions, logging style, migration registration, doc-sync requirements, commit-message format). Feed those specifics to the reviewers alongside the category. Where a category does not apply to the project (e.g., no multi-tenancy, no CLI), the reviewer skips it. Examples in each bullet are illustrative — replace them with the project's actual rule.
 
+> **Profile-driven dimensions (when invoked by ship-feature):** If a ship-feature domain **profile** is active (`ship-feature/profiles/*.md`), its reviewer slice is the source of truth for *which* dimensions to run. The three rubrics below are the `backend` profile. The `frontend` profile substitutes accessibility / responsive / design-fidelity / client-security for the Security rubric and keeps Quality + Standards; full-stack runs both sets plus the seam's contract-consistency / error-propagation / validation-parity checks. Read the active profile and dispatch one fresh reviewer per dimension it names (group related dimensions where sensible — the "three parallel reviewers" count is a default, not a fixed set); keep each reviewer fresh-context and single-focus.
+
 ### Security Reviewer
 
 You are reviewing an implementation plan for security defects. Read the project's conventions doc first. Check every task and step against these categories:
