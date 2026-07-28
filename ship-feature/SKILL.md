@@ -9,11 +9,11 @@ This skill orchestrates a five-stage pipeline that takes a feature from idea (or
 
 **Stages:**
 
-1. **Spec + Plan** -- verify the premise, brainstorm the design, then produce an implementation plan in house style.
+1. **Spec + Plan** -- verify the premise, brainstorm the design, produce an implementation plan in house style, and publish the spec/plan for review — as a draft PR (repo mode) or in the referenced GitHub issue (issue mode).
 2. **Plan Review** -- review of the plan; present it to the human for approval.
 3. **Implementation** -- execute the plan; task-by-task via subagents, or inline for small changes.
 4. **Commit Review** -- security/quality/standards review of the branch diff before push.
-5. **PR Feedback Loop** -- push, open PR, address reviewer feedback for up to N rounds (default 3).
+5. **PR Feedback Loop** -- ready the PR for review (mark the draft ready, or open it and flip the issue label), then address reviewer feedback for up to N rounds (default 3).
 
 ## Profiles: scale the pipeline to the domain
 
@@ -69,11 +69,11 @@ The pipeline mirrors an engineering team: an experienced engineer plans and revi
 
 | Work | Tier | Model |
 |------|------|-------|
-| Planning (stage 1), review triage, orchestration | senior | `claude-opus-4-8[1m]`, high effort |
+| Planning (stage 1), review triage, orchestration | senior | `claude-opus-5`, high effort |
 | Per-task implementation (stage 3) | mid | `claude-sonnet-5` |
-| Reviewer subagents (stages 2 & 4) | senior | `claude-opus-4-8[1m]` |
+| Reviewer subagents (stages 2 & 4) | senior | `claude-opus-5` |
 
-**Default path:** the orchestrating session IS the senior planner/reviewer; spawn stage-3 implementer subagents on `claude-sonnet-5` and reviewer subagents on `claude-opus-4-8[1m]`. **Always specify the model explicitly when dispatching a subagent** — an omitted model inherits the session's model and silently defeats this tiering. (This layers over subagent-driven-development's own "Model Selection" section, pinning its tiers to these concrete IDs.)
+**Default path:** the orchestrating session IS the senior planner/reviewer; spawn stage-3 implementer subagents on `claude-sonnet-5` and reviewer subagents on `claude-opus-5`. **Always specify the model explicitly when dispatching a subagent** — an omitted model inherits the session's model and silently defeats this tiering. (This layers over subagent-driven-development's own "Model Selection" section, pinning its tiers to these concrete IDs.)
 
 The investment is deliberately front-loaded: a well-specified plan from the senior planner is what lets a mid-level executor produce correct code without heavy per-task review (see Review Cadence). **If the executor struggles, the fix is a better-specified plan, not a more expensive executor.**
 
@@ -123,6 +123,8 @@ digraph pipeline {
 
 **Skip condition:** If the user provides a path to an already-approved spec or plan with a `## Pipeline State` block showing stage >= 2, skip to the indicated stage (see Resume below).
 
+**Issue mode (determine this at the very start of stage 1).** If the invocation references a GitHub issue (an issue number/URL in the request, or the topic names one), this run is in **issue mode**; otherwise **repo mode**. Record the issue (or `n/a`) in Pipeline State's `issue` field. Issue mode changes two things: (1) the spec and plan live in the issue, not the repo (step 4); and (2) **all human interaction during stage 1 and the stage-2 gate happens in the issue, never the CLI.** Post every brainstorming clarifying question — and the gate itself — as an issue comment (`gh issue comment`), then poll the issue for the human's reply (a new comment authored by someone other than you or the bot, posted after your question) and continue from it. Poll on a bounded window (e.g. every 30–60s); if no reply arrives in that window, STOP and report the run as **paused awaiting the issue** (note the comment URL) — it resumes later from the Pipeline State block in the issue. Do NOT fall back to asking in the CLI in issue mode.
+
 0. **Premise & blast-radius check (do this FIRST, by reading code — not assumption).** Before brainstorming design *details*, verify the design *premise*: the facts the whole change rests on. A plan built on a wrong premise passes every downstream review — three fresh reviewers will all bless a correct-looking implementation of the wrong thing, because the error is baked equally into the plan and the spec. Review layers cannot catch a shared blind spot; only checking reality up front can. Concretely, answer each of these by grepping/reading, and record the findings (with `file:line` evidence) in the spec — or, for a Small change that skips the spec, in the plan's Architecture/Global-Constraints preamble:
    - **Entry path — how is the thing I'm changing actually reached?** Who calls this endpoint/function/flag? Is there a proxy, gateway, BFF, or other indirection in front of it? (For a public/agent-facing surface: trace the real request path end-to-end, across repos.)
    - **Blast radius — what else lives on this path?** Enumerate every repo, service, and surface the change touches or that consumes its output. If the answer includes another repo, that repo is IN SCOPE for this run, not a follow-up.
@@ -132,12 +134,12 @@ digraph pipeline {
 
    If any answer is unknown after a reasonable search, that is itself a finding to surface — do not paper over it with a plausible guess. This step is cheap (minutes of grep) and is the single highest-leverage defense against a full rework.
 
-1. Invoke `superpowers:brainstorming` to explore design space, requirements, and edge cases, informed by the step-0 findings, then write a spec. **Exception — Small changes (see Right-Sizing): skip both brainstorming and the written spec entirely** once the step-0 premise check is clean and the approach is unambiguous; the premise check is the correctness gate and the plan (next step) doubles as the spec. If a written spec already exists (user provides path or one exists at `docs/superpowers/specs/`), skip brainstorming and proceed directly to the plan — but still run the step-0 premise check against that spec. For a borderline Small/Standard change whose approach is clear but not trivial, keep brainstorming lightweight: confirm the approach in one exchange rather than running the full one-question-at-a-time ceremony.
+1. Invoke `superpowers:brainstorming` to explore design space, requirements, and edge cases, informed by the step-0 findings, then write a spec. **Exception — Small changes (see Right-Sizing): skip both brainstorming and the written spec entirely** once the step-0 premise check is clean and the approach is unambiguous; the premise check is the correctness gate and the plan (next step) doubles as the spec. If a written spec already exists (user provides path or one exists at `docs/superpowers/specs/`), skip brainstorming and proceed directly to the plan — but still run the step-0 premise check against that spec. For a borderline Small/Standard change whose approach is clear but not trivial, keep brainstorming lightweight: confirm the approach in one exchange rather than running the full one-question-at-a-time ceremony. **In issue mode, conduct every brainstorming question through the issue** (post the question as a comment and await the human's reply per the Issue-mode note above) — not in the CLI.
 2. Invoke `superpowers:writing-plans` to produce the implementation plan, layering the following **house plan style** on top of whatever that skill produces:
 
    **House plan style requirements (all five MUST be present):**
 
-   - **File location:** `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`
+   - **File location:** `docs/superpowers/plans/YYYY-MM-DD-<topic>.md` (repo mode) — in **issue mode** the plan lives in the referenced issue instead of the repo; see stage 1 step 4.
    - **Global Constraints preamble:** A section immediately after the Architecture block titled `## Global Constraints` that restates verbatim the binding conventions relevant to this feature, copied word-for-word from the project's conventions doc — the first agent-instructions/standards file that exists at the repo root: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, or `STANDARDS.md`/`STYLEGUIDE.md` (follow any links a primary file makes to a detailed standards doc). Restate only the rules this feature can touch (e.g., routing/handler conventions, logging style, ORM/schema conventions, commit-message format, doc-sync requirements). Copy rules word-for-word; do not paraphrase.
    - **Verified external API section:** A section titled with the exact text `Verified external API (do not re-derive)` listing exact function signatures, type definitions, and method behaviors of any external or library APIs the plan depends on. Pin these by reading the actual source; do not guess from memory.
    - **Checkbox tasks with agentic-worker header:** Every task uses `- [ ]` checkbox syntax for step tracking. The plan MUST begin with:
@@ -146,33 +148,48 @@ digraph pipeline {
 
 3. After writing the plan, initialize the Pipeline State block (see below).
 
+4. **Publish the planning artifacts for review — location follows the run's mode (set at stage-1 start; see the Issue-mode note above).** Either way, create the feature branch at the START of stage 1 — as soon as the premise check has fixed the topic.
+
+   - **Repo mode (default) — commit the artifacts + open a draft PR.** As each artifact is produced: commit the spec (`docs: <topic> spec`), `git push -u origin <branch>`, and open a **draft** PR against the default branch (`gh pr create --draft --title "<type>: <topic>" --body "<spec/plan under review; implementation follows after the ship-feature human gate>"`); then commit the plan (`docs: <topic> plan`) and push. For a Small change the plan is the first artifact and is what opens the draft PR. Record branch + PR number in Pipeline State. If the repo has no GitHub remote, commit the artifacts locally and skip the draft PR.
+
+   - **Issue mode — the spec and plan live in the ISSUE, not the repo.** Do NOT create the `docs/superpowers/specs|plans` files and do NOT open a stage-1 draft PR (there is no diff yet to open one from). Redirect the brainstorming / writing-plans output into the issue: post the spec as one issue comment and the plan as a separate issue comment (`gh issue comment <n> --body-file <file>`), each carrying the full content the repo files would — the plan keeps the *entire* house style. On revision, EDIT the plan comment in place (track its comment ID/URL in Pipeline State); do not post duplicate plans. The issue is the review surface. Materialize a local, UNCOMMITTED working copy of the plan for the executor tooling that needs a plan file (subagent-driven-development's `task-brief` / `review-package`), kept in sync with the issue comment. The PR is opened later, at stage 5.
+
+   **In BOTH modes** the review surface (draft PR or issue) does **not** start the stage-5 feedback loop and does **not** replace the human gate — implementation waits for gate approval. Bot/human comments on the draft PR or the issue are inputs to the **stage-2** plan review and the gate, not stage-5 rounds. The repo-mode PR stays a **draft** until stage 5.
+
+   **Issue-mode status labels (machine-readable state on the issue):** at the **gate** approval (stage 2) apply `status:ready-for-execution`; when the **PR is readied for review** (stage 5) remove it and apply `status:ready-for-review`. Ensure each label exists in the repo before applying (create it if missing). Labels are issue-mode only; repo mode uses the draft→ready PR state as the equivalent signal.
+
 ### Stage 2: Plan Review + Human Gate
 
-1. Review the plan per the Right-Sizing class, using the **active profile's reviewer slice** to set the dimensions and dispatching reviewers on `claude-opus-4-8[1m]`: **Standard/Large** invoke `reviewing-plans` (three profile-aware reviewers — backend uses security/quality/standards; frontend substitutes a11y/responsive/design-fidelity/client-security for the backend security rubric and keeps quality/standards; full-stack runs both plus the seam's contract-consistency/error-propagation/validation-parity dimensions); **Small** run a single combined-dimension review pass (self-review against the same profile rubric, or one reviewer subagent) unless the step-0 premise check flagged risk, in which case escalate to the full `reviewing-plans`. Either way, a review of some weight always runs before the gate.
+1. Review the plan per the Right-Sizing class, using the **active profile's reviewer slice** to set the dimensions and dispatching reviewers on `claude-opus-5`: **Standard/Large** invoke `reviewing-plans` (three profile-aware reviewers — backend uses security/quality/standards; frontend substitutes a11y/responsive/design-fidelity/client-security for the backend security rubric and keeps quality/standards; full-stack runs both plus the seam's contract-consistency/error-propagation/validation-parity dimensions); **Small** run a single combined-dimension review pass (self-review against the same profile rubric, or one reviewer subagent) unless the step-0 premise check flagged risk, in which case escalate to the full `reviewing-plans`. Either way, a review of some weight always runs before the gate.
 2. Apply fixes from the review to the plan inline.
 3. **THE GATE:** Present the reviewed plan to the human. State explicitly:
 
    > The plan has been reviewed (across the active profile's dimensions — e.g. security/quality/standards for backend, or accessibility/responsive/design-fidelity/client-security for frontend). Please review and approve to proceed with implementation, or provide feedback for revision.
 
-4. **STOP HERE. Do not write any implementation code until the human explicitly approves.** If the human requests changes, revise the plan (return to stage 1 step 2 or just edit inline), re-run the plan review, and present again.
+   In **issue mode**, post this gate as an issue comment and wait for the human's approval (or feedback) reply *in the issue*, per the Issue-mode note in Stage 1 — do not prompt in the CLI. In repo mode, present it in the CLI as usual.
+
+4. **STOP HERE. Do not write any implementation code until the human explicitly approves.** If the human requests changes, revise the plan (return to stage 1 step 2 or just edit inline — in issue mode, edit the plan comment in place), re-run the plan review, and present again.
+5. **On approval, record the "gate passed" signal.** In **issue mode**, apply the `status:ready-for-execution` label to the issue (create the label first if it doesn't exist). In repo mode there is no issue to label — the approved plan on the draft PR is the signal.
 
 ### Stage 3: Implementation
 
 1. Execute the plan per the Right-Sizing class, spawning implementer subagents on `claude-sonnet-5` (the mid-level executor — see Model Tiering): **Standard/Large** invoke `superpowers:subagent-driven-development` (fresh subagent per task, or batching only trivial tasks); **Small** execute inline with `superpowers:executing-plans`. Either way, follow the plan's checkbox tasks and apply the **active profile's executor slice** to verify each task (backend: TDD + gates green; frontend: run the app, drive it, screenshot at the plan's breakpoints, a11y check, gates; full-stack: also verify the seam end-to-end — real UI action → real API → real data layer).
-2. Apply the **Review Cadence** to subagent-driven-development: (a) dispatch a per-task reviewer ONLY for tasks the plan tagged `review: yes` — `review: no` tasks are gated by their own acceptance criteria (tests/screenshots), not a reviewer; (b) do NOT run SDD's final whole-branch review — the single authoritative fan-out is stage 4; (c) any re-review is scope-bounded to the fix, not a fresh whole-diff pass. Dispatch the per-task reviewers on `claude-opus-4-8[1m]`.
+2. Apply the **Review Cadence** to subagent-driven-development: (a) dispatch a per-task reviewer ONLY for tasks the plan tagged `review: yes` — `review: no` tasks are gated by their own acceptance criteria (tests/screenshots), not a reviewer; (b) do NOT run SDD's final whole-branch review — the single authoritative fan-out is stage 4; (c) any re-review is scope-bounded to the fix, not a fresh whole-diff pass. Dispatch the per-task reviewers on `claude-opus-5`.
 3. Update Pipeline State after completion.
 
 ### Stage 4: Commit Review
 
 1. This is the **one authoritative whole-diff fan-out** (see Review Cadence). Run it per the Right-Sizing class:
-   - **Standard/Large:** invoke `reviewing-commits` on the feature branch — mechanical gates (format, lint, test) then three parallel **profile-aware** reviewers over the branch diff (dimensions from the active profile's reviewer slice, as in Stage 2), dispatched on `claude-opus-4-8[1m]`; triage, fix as commits, re-run gates. Re-reviews are scope-bounded to each fix, not a fresh whole-diff pass. Stage 3 skipped SDD's final review precisely so this is the single fan-out — do not look for a prior whole-branch review to dedupe against.
+   - **Standard/Large:** invoke `reviewing-commits` on the feature branch — mechanical gates (format, lint, test) then three parallel **profile-aware** reviewers over the branch diff (dimensions from the active profile's reviewer slice, as in Stage 2), dispatched on `claude-opus-5`; triage, fix as commits, re-run gates. Re-reviews are scope-bounded to each fix, not a fresh whole-diff pass. Stage 3 skipped SDD's final review precisely so this is the single fan-out — do not look for a prior whole-branch review to dedupe against.
    - **Small:** run the project's mechanical gates + a single self-review against the profile's reviewer rubric, then rely on the stage-5 PR bot as the fan-out. Skip the 3-reviewer pass.
 2. Update Pipeline State after completion.
 
 ### Stage 5: PR Feedback Loop
 
-1. Push the branch and open a PR (if not already open).
-2. Invoke `pr-feedback-loop` with N=3 (default). This waits for the bot review, triages findings, applies fixes, replies to threads, and repeats for up to N rounds.
+1. **Ready the PR for review — mode-aware:**
+   - **Repo mode:** the draft PR already exists from stage 1. Push the implementation + stage-4 commits, update the PR body to the full description (the format in `~/.claude/commands/generate-pr-description.md`), and mark it **ready for review**: `gh pr ready <n>`. (Fall back to `gh pr create` only if no PR exists — e.g. a no-GitHub-remote run that skipped the stage-1 draft.)
+   - **Issue mode:** no stage-1 PR exists. Push the branch and open the PR now (`gh pr create` with the full description, linking the issue via `Closes #<issue>`), then flip the issue's status label: remove `status:ready-for-execution` and add `status:ready-for-review`.
+2. Invoke `pr-feedback-loop` with N=3 (default). This waits for the bot review, triages findings, applies fixes, replies to threads, and repeats for up to N rounds. (pr-feedback-loop sees the PR already open and skips its own create-PR setup; the `docs:` spec/plan commits do not match its round-counter grep, so round numbering is unaffected.)
 3. Update Pipeline State after each round.
 4. When the loop terminates (clean round or cap reached), produce the final status report.
 
@@ -180,7 +197,7 @@ digraph pipeline {
 
 ## Pipeline State
 
-After each stage transition, update a `## Pipeline State` block in the plan document. Format:
+After each stage transition, update a `## Pipeline State` block in the plan document. (In **issue mode** the plan document is the issue's plan comment — keep the Pipeline State block there, and edit it in place; the `status:*` labels are a coarse public mirror, not a replacement for the block. In **team mode** it is the separate Pipeline State file — see Team Mode.) Format:
 
 ```markdown
 ## Pipeline State
@@ -190,6 +207,7 @@ After each stage transition, update a `## Pipeline State` block in the plan docu
 | stage   | 3 (implementation)             |
 | class   | small (mechanical rename, no new surface) |
 | profile | frontend                       |
+| issue   | #<n> (issue mode) or n/a       |
 | branch  | feat/<topic>                   |
 | pr      | #<n>                           |
 | round   | 0                              |
@@ -199,8 +217,9 @@ After each stage transition, update a `## Pipeline State` block in the plan docu
 - `stage` -- current stage number and name (e.g., `1 (spec + plan)`, `2 (plan review)`, `3 (implementation)`, `4 (commit review)`, `5 (pr feedback loop)`)
 - `class` -- the Right-Sizing class (`small` / `standard` / `large`) plus a one-line reason, set at stage 1 start. Drives the weight of stages 2–4.
 - `profile` -- the active domain profile(s): `backend` (default), `frontend`, or `frontend+backend+seam` (full-stack), set at stage 1 start. Drives which planner/executor/reviewer slices each stage applies.
-- `branch` -- the feature branch name (set at stage 3 start)
-- `pr` -- the PR number (set when opened in stage 5; `n/a` before)
+- `issue` -- the GitHub issue driving this run, if any (**issue mode**: the spec/plan live in the issue, not the repo, and the `status:ready-for-execution` → `status:ready-for-review` labels track state). `n/a` in repo mode.
+- `branch` -- the feature branch name (created at stage 1 start, so the draft PR can be opened)
+- `pr` -- the PR number (opened as a DRAFT in stage 1 carrying the spec/plan; marked ready-for-review in stage 5). `n/a` only before the first artifact is pushed, or on a no-GitHub-remote run
 - `round` -- current feedback round within stage 5 (0 before stage 5)
 
 **Resume:** On invocation, if the target plan doc already has a Pipeline State block, read it and RESUME from the indicated stage rather than starting over. For example, if stage = `4 (commit review)` and branch is set, skip stages 1-3 and begin at stage 4.
@@ -229,16 +248,16 @@ Team mode reassigns the five stages above to a four-teammate agent team while ke
 
 Team mode is active **only when the team tools (SendMessage / the shared task-list tools / the teammate-spawn mechanism) are AVAILABLE** in this session. Do NOT test `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` from the shell — a settings.json env var is not reliably exported into Bash, so tool availability is the only reliable in-band signal. If the team tools are ABSENT, team mode is skipped and the existing five-stage subagent flow above is the behavior **verbatim** (that is the default). A single team-tool-availability check is the branch point.
 
-**Model/effort precondition:** at team startup, verify the teammate model IDs `claude-opus-4-8[1m]` and `claude-sonnet-5` resolve and that per-teammate reasoning effort is settable. If a model ID or the effort knob is unavailable, spawn that teammate on the default model and RECORD the deviation in the Pipeline State file rather than silently failing stage 1 or 3.
+**Model/effort precondition:** at team startup, verify the teammate model IDs `claude-opus-5` and `claude-sonnet-5` resolve and that per-teammate reasoning effort is settable. If a model ID or the effort knob is unavailable, spawn that teammate on the default model and RECORD the deviation in the Pipeline State file rather than silently failing stage 1 or 3.
 
 ### Roles (exact model IDs)
 
 | Role | Model | Effort | Owns |
 |------|-------|--------|------|
-| Architect | `claude-opus-4-8[1m]` | high | Stage 1 (spec + plan); applies QA's plan fixes in stage 2 |
+| Architect | `claude-opus-5` | high | Stage 1 (spec + plan); applies QA's plan fixes in stage 2 |
 | Implementer | `claude-sonnet-5` | default | Stage 3 (implementation) + the fix-application half of stage 4 |
-| QA | `claude-opus-4-8[1m]` | default | Stage 2 review dispatch/triage + stage 4 read-only review + whole-PR pre-open pass |
-| Feedback | `claude-opus-4-8[1m]` | default | Stage 5 preparation (fixes + local round commit + draft replies) |
+| QA | `claude-opus-5` | default | Stage 2 review dispatch/triage + stage 4 read-only review + whole-PR pre-open pass |
+| Feedback | `claude-opus-5` | default | Stage 5 preparation (fixes + local round commit + draft replies) |
 
 The **LEAD** is the user's main session and is fixed — it cannot be delegated to a teammate.
 
@@ -290,7 +309,7 @@ The Autonomy Contract above **binds the LEAD, not teammates.** Teammates do not 
 The lead — and only the lead — owns:
 
 - **The single human gate.** No teammate presents or advances it. On approval the lead writes `gate_approved=true` (with date) into the Pipeline State file AND passes an explicit `gate: approved on <date>` token to the Implementer at (re)spawn. The lead confirms gate status before ANY stage-3 (re)spawn so a stale `stage` value cannot skip the gate.
-- **All push and PR actions:** `git push`, `gh pr create`, and every state-changing `gh` call. Teammates prepare; the lead executes.
+- **All push, PR, and issue actions:** `git push`, `gh pr create`, `gh pr ready`, `gh issue comment`, `gh issue edit --add-label`/`--remove-label`, and every state-changing `gh` call. Teammates prepare; the lead executes. In **repo mode** this includes the **stage-1 draft PR**: the Architect writes the spec/plan docs, and the lead commits them (`docs: <topic> spec`/`plan`), pushes, and opens the draft PR — then marks that same PR ready-for-review in stage 5. In **issue mode** the Architect writes the spec/plan and the lead posts them to the issue (editing the plan comment on revision) and drives the `status:*` labels — `status:ready-for-execution` at gate approval, `status:ready-for-review` when the PR opens in stage 5. The lead is also the one who posts the Architect's stage-1 clarifying questions and the gate to the issue and relays the human's replies back to the Architect — teammates never address the human directly, so the issue-as-conversation rule routes through the lead.
 - **All PR thread replies,** posted using Feedback's keyed draft replies.
 - **Never merges** — the pipeline never merges; only the human does, and the lead does not either (even though the lead executes pushes and PR actions).
 - **The three BLOCKING autonomy exceptions.** Teammates STOP and block on detection; the lead is the sole human-facing router. The lead must acknowledge every exception flag; teammates default to STALL if no ack arrives, so the unreliable SendMessage channel fails safe.
@@ -313,12 +332,12 @@ Two teammates editing the same file overwrite each other, so work is partitioned
 
 ### Spawn-prompt sketches
 
-Each teammate auto-loads ship-feature; every spawn prompt therefore names the single skill the teammate follows and repeats **"ignore this Team Mode section."** Each spawn prompt must ALSO state the active **profile(s)** (from Pipeline State) so the teammate applies the matching slice for its stage — the Architect the planner slice, the Implementer the executor slice, QA the reviewer slice. Model tiering (Architect/reviewers on `claude-opus-4-8[1m]`, Implementer on `claude-sonnet-5`) and the Review Cadence bind teammates exactly as they bind the default path.
+Each teammate auto-loads ship-feature; every spawn prompt therefore names the single skill the teammate follows and repeats **"ignore this Team Mode section."** Each spawn prompt must ALSO state the active **profile(s)** (from Pipeline State) so the teammate applies the matching slice for its stage — the Architect the planner slice, the Implementer the executor slice, QA the reviewer slice. Model tiering (Architect/reviewers on `claude-opus-5`, Implementer on `claude-sonnet-5`) and the Review Cadence bind teammates exactly as they bind the default path.
 
-- **Architect** — "You are the Architect teammate (model `claude-opus-4-8[1m]`, high effort). Team mode is active (team tools present). Execute ONLY ship-feature stage 1: `superpowers:brainstorming` (skip if a spec exists under `docs/superpowers/specs/`) then `superpowers:writing-plans` with house style (plan at `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`; verbatim Global Constraints; 'Verified external API (do not re-derive)' section; checkbox tasks; agentic-worker header). You OWN only the plan doc file — never the Pipeline State file, never source. IGNORE ship-feature's '## Team Mode' section: you are a teammate, not the lead. When the plan is drafted, SendMessage the lead 'plan drafted, ready for review' and STOP — do NOT invoke `reviewing-plans`, do NOT triage/grade your own plan, do NOT present the gate. In stage 2, apply ONLY the fixes QA sends you (claim its shared task item, edit the plan, mark done, reply); QA verifies. Re-plan only if the lead relays an approved architecture-deviation. For any ambiguity/exception, STOP and SendMessage the LEAD (never the human) and block until acked."
+- **Architect** — "You are the Architect teammate (model `claude-opus-5`, high effort). Team mode is active (team tools present). Execute ONLY ship-feature stage 1: `superpowers:brainstorming` (skip if a spec exists under `docs/superpowers/specs/`) then `superpowers:writing-plans` with house style (plan at `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`; verbatim Global Constraints; 'Verified external API (do not re-derive)' section; checkbox tasks; agentic-worker header). You OWN only the plan doc file — never the Pipeline State file, never source. IGNORE ship-feature's '## Team Mode' section: you are a teammate, not the lead. When the plan is drafted, SendMessage the lead 'plan drafted, ready for review' and STOP — do NOT invoke `reviewing-plans`, do NOT triage/grade your own plan, do NOT present the gate. In stage 2, apply ONLY the fixes QA sends you (claim its shared task item, edit the plan, mark done, reply); QA verifies. Re-plan only if the lead relays an approved architecture-deviation. For any ambiguity/exception, STOP and SendMessage the LEAD (never the human) and block until acked."
 - **Implementer** — "You are the Implementer teammate (model `claude-sonnet-5`). Team mode is active. Before anything, confirm the lead passed a `gate: approved on <date>` token and that Pipeline State shows `gate_approved=true`; if not, refuse and ask the lead to confirm — never start stage 3 on an unapproved plan. Execute ONLY ship-feature stage 3 via `superpowers:subagent-driven-development` against the approved plan, then stage-4 fixes; STOP at those boundaries. IGNORE ship-feature's '## Team Mode' section — you are a teammate, never spawn teammates or advance the pipeline. You OWN all source-file writes and all local code commits; write nothing else. Before handoff run the project's format/lint/test gates to green, then SendMessage QA 'stage 3 green, committed'. In stage 4, claim QA's fix tasks ONE AT A TIME, apply, re-run gates, commit (fixup+autosquash or conventional), SendMessage QA 'commit <sha> complete, tree quiesced', and WAIT before touching the tree again. Never push, open PRs, reply to threads, or touch Pipeline State. On any exception, STOP and SendMessage the LEAD and block until acked."
-- **QA** — "You are QA, the dedicated reviewer teammate (model `claude-opus-4-8[1m]`). Team mode is active. You NEVER edit code, the plan, or any file — you dispatch fresh-context reviewer subagents (classic Agent-tool subagents, since teammates cannot spawn teammates), triage, ARTICULATE fixes to the author, then VERIFY. IGNORE ship-feature's '## Team Mode' section. Stage 2: follow `reviewing-plans`' 'Running as a team-mode teammate' note — dispatch the 3 fresh subagents, triage, SendMessage each required change to the Architect + create one shared task item, verify after it edits (re-dispatch the quality subagent if a fix touched Interfaces), report the disposition table to the lead. Stage 4: follow `reviewing-commits`' team-mode note — run gates READ-ONLY as findings; if red, articulate to the Implementer and wait for green before dispatching reviewers; run gates + branch diff ONLY on a quiesced tree (after 'commit N complete, tree quiesced'), never overlapping the Implementer's git ops; dispatch 3 fresh subagents; SendMessage each Fix to the Implementer as a shared task; verify each; loop until converged; then run the whole-PR pre-open pass and SendMessage the lead 'review-ready'. Surface architecture-deviation findings to the LEAD and block until it decides. Never push or open PRs."
-- **Feedback** — "You are the Feedback teammate (model `claude-opus-4-8[1m]`). Team mode is active. IGNORE ship-feature's '## Team Mode' section — you are a teammate, never orchestrate. Follow `pr-feedback-loop`'s 'Running as a team-mode teammate' note. Setup push + `gh pr create` (lead already did these), posting replies, and `git push` are all SUSPENDED — you do NONE of them. Determine round k from the lead-maintained Pipeline State `round`, NOT git-log commit count. Wait for the bot review using the PREV_RUN_ID the lead handed you. Collect threads + human comments (read-only `gh`), triage, apply Fix changes, run the project's format/lint/test gates, create the round commit LOCALLY (`fix: address PR #<n> review round <k> — <summary>`, no trailers). SendMessage the lead ONE package: commit sha + findings-disposition table + per-thread draft replies keyed by thread/comment ID + the bot run ID you acted on — and STOP. Do NOT resume until the lead SendMessages 'pushed round k, PREV_RUN_ID=<id>'; then begin the round k+1 wait. For any of the three autonomy exceptions, STOP and SendMessage the LEAD and block until it decides. Never push, post replies, or merge."
+- **QA** — "You are QA, the dedicated reviewer teammate (model `claude-opus-5`). Team mode is active. You NEVER edit code, the plan, or any file — you dispatch fresh-context reviewer subagents (classic Agent-tool subagents, since teammates cannot spawn teammates), triage, ARTICULATE fixes to the author, then VERIFY. IGNORE ship-feature's '## Team Mode' section. Stage 2: follow `reviewing-plans`' 'Running as a team-mode teammate' note — dispatch the 3 fresh subagents, triage, SendMessage each required change to the Architect + create one shared task item, verify after it edits (re-dispatch the quality subagent if a fix touched Interfaces), report the disposition table to the lead. Stage 4: follow `reviewing-commits`' team-mode note — run gates READ-ONLY as findings; if red, articulate to the Implementer and wait for green before dispatching reviewers; run gates + branch diff ONLY on a quiesced tree (after 'commit N complete, tree quiesced'), never overlapping the Implementer's git ops; dispatch 3 fresh subagents; SendMessage each Fix to the Implementer as a shared task; verify each; loop until converged; then run the whole-PR pre-open pass and SendMessage the lead 'review-ready'. Surface architecture-deviation findings to the LEAD and block until it decides. Never push or open PRs."
+- **Feedback** — "You are the Feedback teammate (model `claude-opus-5`). Team mode is active. IGNORE ship-feature's '## Team Mode' section — you are a teammate, never orchestrate. Follow `pr-feedback-loop`'s 'Running as a team-mode teammate' note. Setup push + `gh pr create` (lead already did these), posting replies, and `git push` are all SUSPENDED — you do NONE of them. Determine round k from the lead-maintained Pipeline State `round`, NOT git-log commit count. Wait for the bot review using the PREV_RUN_ID the lead handed you. Collect threads + human comments (read-only `gh`), triage, apply Fix changes, run the project's format/lint/test gates, create the round commit LOCALLY (`fix: address PR #<n> review round <k> — <summary>`, no trailers). SendMessage the lead ONE package: commit sha + findings-disposition table + per-thread draft replies keyed by thread/comment ID + the bot run ID you acted on — and STOP. Do NOT resume until the lead SendMessages 'pushed round k, PREV_RUN_ID=<id>'; then begin the round k+1 wait. For any of the three autonomy exceptions, STOP and SendMessage the LEAD and block until it decides. Never push, post replies, or merge."
 
 ## Red Flags
 
@@ -339,3 +358,5 @@ These are rationalization patterns from baseline runs. If you catch yourself thi
 5. **"I can skip brainstorming and the spec for a small feature."** ACCEPTABLE for a Small change (see Right-Sizing) once the stage-1 step-0 premise check is clean and the approach is unambiguous — go straight to the plan, which doubles as the spec. ALSO acceptable if a written spec already exists. But note what you may NOT skip: the premise check is never optional (Red Flag #6), the plan is never skipped, and the human gate never goes away. For Standard/Large changes with no existing spec, brainstorming + a written spec still run — they surface requirements and edge cases before planning.
 
 8. **"I'll review every task / re-scan the whole diff to be thorough."** WRONG — this is the stall the Review Cadence exists to prevent. A `review: no` task is gated by its own acceptance criteria (tests/screenshots), not a per-task reviewer; a re-review verifies only the fix, not the whole diff again. Thoroughness comes from ONE good whole-diff fan-out plus a well-specified plan, not from stacking fresh reviews that each invent new subjective findings. If you feel a task needs its own reviewer, the fix is to tag it `review: yes` in the plan — decided by the senior planner up front, not improvised mid-execution. (This is the mirror of Red Flag #1: you may never skip review, and you may never let it ratchet.)
+
+9. **"The draft PR is open, so I can start implementing (or mark it ready)."** WRONG. The stage-1 draft PR only exposes the spec/plan for review — it is NOT gate approval. Implementation still waits for the explicit human gate (stage 2), and the PR stays a draft until stage 5. Opening it early moves the plan *review* earlier; it does not move the *gate*.

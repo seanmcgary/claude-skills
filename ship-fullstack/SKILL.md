@@ -5,7 +5,7 @@ description: Use when taking a feature that spans both UI and server (e.g. a new
 
 ## Overview
 
-This is **`ship-feature` with both the `frontend` and `backend` profiles pinned, plus the `seam` addendum.** It is not a separate pipeline. Follow `ship-feature` exactly — its five stages, the single human gate, the autonomy contract, right-sizing, model tiering (senior planner on `claude-opus-4-8[1m]`, mid-level executor on `claude-sonnet-5`, senior reviewers on `claude-opus-4-8[1m]`), the review cadence, and team mode are all inherited unchanged.
+This is **`ship-feature` with both the `frontend` and `backend` profiles pinned, plus the `seam` addendum.** It is not a separate pipeline. Follow `ship-feature` exactly — its five stages, the single human gate, the autonomy contract, right-sizing, model tiering (senior planner on `claude-opus-5`, mid-level executor on `claude-sonnet-5`, senior reviewers on `claude-opus-5`), the review cadence, and team mode are all inherited unchanged.
 
 The only difference: **both** profiles are active, and the `seam` addendum (the client/server contract) applies on top. Skip ship-feature's profile-inference step — the profiles are pinned by this entry point.
 

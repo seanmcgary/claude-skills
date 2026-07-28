@@ -5,7 +5,7 @@ description: Use when taking a frontend/UI feature from idea or spec all the way
 
 ## Overview
 
-This is **`ship-feature` with the `frontend` profile pinned.** It is not a separate pipeline. Follow `ship-feature` exactly — its five stages, the single human gate, the autonomy contract, right-sizing, model tiering (senior planner on `claude-opus-4-8[1m]`, mid-level executor on `claude-sonnet-5`, senior reviewers on `claude-opus-4-8[1m]`), the review cadence, and team mode are all inherited unchanged.
+This is **`ship-feature` with the `frontend` profile pinned.** It is not a separate pipeline. Follow `ship-feature` exactly — its five stages, the single human gate, the autonomy contract, right-sizing, model tiering (senior planner on `claude-opus-5`, mid-level executor on `claude-sonnet-5`, senior reviewers on `claude-opus-5`), the review cadence, and team mode are all inherited unchanged.
 
 The only difference: the active profile is **`frontend`**, not the default `backend`. Skip ship-feature's profile-inference step — the profile is pinned by this entry point.
 
