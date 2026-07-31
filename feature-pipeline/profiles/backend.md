@@ -1,8 +1,8 @@
 # Profile: backend
 
-The **default** profile. Server, data, and API work — routes, handlers, business logic, schema/migrations, background jobs, integrations. This profile is the domain ship-feature was originally tuned for; it makes the engine's existing behavior explicit so the other profiles can differ from a named baseline.
+The **default** profile. Server, data, and API work — routes, handlers, business logic, schema/migrations, background jobs, integrations. This profile is the pipeline's original baseline; it makes the default behavior explicit so the other profiles can differ from a named starting point.
 
-A profile supplies three slices, each consumed by a different stage. Load this file at the start of stages 1, 3, and 4 and apply the matching slice.
+A profile supplies three slices, each consumed by a different phase. **`plan-feature` loads the planner slice (planning) and the reviewer slice (plan review); `build-feature` loads the executor slice (implementation) and the reviewer slice (commit review); `ship-feature` loads all three, at its stages 1, 3, and 4.** Load this file at the start of each and apply the matching slice.
 
 ## Planner slice (stage 1)
 
@@ -14,7 +14,7 @@ A profile supplies three slices, each consumed by a different stage. Load this f
 
 **Task shapes to author:** migration (+ registration), request/response type + validation, route/handler wired to its auth mechanism, service method, data-access method scoped by owner/tenant, and a test step per producing task. Order so schema precedes the code that reads it.
 
-**Per-task `review:` tag** — flag `review: yes` for tasks that touch a risky boundary (auth, money, migrations, raw queries, concurrency, cross-tenant data); flag `review: no` for mechanical/transcription tasks whose correctness the whole-diff fan-out will still cover. See ship-feature's Review Cadence for how the tag is used.
+**Per-task `review:` tag** — flag `review: yes` for tasks that touch a risky boundary (auth, money, migrations, raw queries, concurrency, cross-tenant data); flag `review: no` for mechanical/transcription tasks whose correctness the whole-diff fan-out will still cover. See `conventions.md`'s Review Cadence for how the tag is used.
 
 **Per-task acceptance to bake in:** the covering test(s) pass; error paths return/handle explicitly; the change respects the Global Constraints copied into the plan.
 

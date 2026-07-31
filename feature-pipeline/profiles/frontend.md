@@ -2,7 +2,7 @@
 
 UI and client work — components, client state, styling, interaction, and accessibility. This profile changes what the planner authors, how the executor verifies, and which dimensions the reviewers grade; it does **not** change the engine's stages, gate, autonomy contract, or model tiering.
 
-A profile supplies three slices, each consumed by a different stage. Load this file at the start of stages 1, 3, and 4 and apply the matching slice.
+A profile supplies three slices, each consumed by a different phase. **`plan-feature` loads the planner slice (planning) and the reviewer slice (plan review); `build-feature` loads the executor slice (implementation) and the reviewer slice (commit review); `ship-feature` loads all three, at its stages 1, 3, and 4.** Load this file at the start of each and apply the matching slice.
 
 ## Planner slice (stage 1)
 

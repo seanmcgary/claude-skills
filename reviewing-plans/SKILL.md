@@ -20,8 +20,6 @@ If no conventions doc exists, note that in the findings table and review against
 
 ## Process
 
-> **Team mode:** If team tools (SendMessage / shared task list) are available and you are the QA teammate, step 3 (edit the plan inline) is SUSPENDED — see ["Running as a team-mode teammate"](#running-as-a-team-mode-teammate) at the end of this section before editing anything.
-
 1. **Dispatch three reviewers in parallel** — send three Agent tool calls in a single message, one per dimension. Resolve the project's conventions doc as described in "Project conventions doc" above. Each subagent receives: the plan file path, the matching rubric below (verbatim), the path to the conventions doc, and the instruction: "Read the conventions doc first. For every finding, quote the specific project rule by name that is violated (or cite the codebase precedent if the rule is architecture-derived rather than written down). Output findings as a structured list: `| task/step | defect description | severity | rule cited |`." If a reviewer returns garbage (no structured findings, off-topic, or fewer than 3 sentences), re-dispatch that single reviewer once with a more explicit prompt. If the re-dispatch also returns garbage or off-topic output, perform that dimension's review yourself inline in the current context using the same rubric, and note the fallback in the findings table.
 
 2. **Collect findings** — gather all findings into a unified list with columns: `task/step`, `defect`, `dimension` (security/quality/standards), `severity` (high/medium/low).
@@ -40,38 +38,11 @@ If no conventions doc exists, note that in the findings table and review against
    |---|-----------|--------|-----------|----------|-------------|-------|
    ```
 
-### Running as a team-mode teammate
-
-> **⚠️ UNVALIDATED-BY-LIVE-TEAM:** Team mode is enabled at the harness level by the experimental agent-teams flag (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), but is detected in-band by team-tool availability (see below), not by reading the env var. It has NOT been validated by a live team run. The RED/GREEN ground-truth re-run (QA-as-teammate re-reviewing a real PR diff vs. a subagent baseline, on catch-rate AND token cost) was deferred and is NOT complete. Treat this path as experimental; the standalone/subagent path below the flag is the safe default.
-
-**When this applies.** Only when the team tools (SendMessage / shared task list / spawn mechanism) are AVAILABLE and you are running as the **QA teammate** in the ship-feature pipeline. Detection is by the AVAILABILITY of those tools, NOT by reading the env var (a settings.json env var is not reliably exported into the shell). **When the team tools are absent, everything above is UNCHANGED: the invoker dispatches the reviewers, triages, and edits the plan inline at step 3 itself.** This subsection changes nothing about the standalone/subagent path.
-
-In team mode, QA is a **dedicated reviewer that writes NO files** — it never edits the plan. The plan's author (the Architect teammate) is the sole writer of the plan doc. QA dispatches, triages, ARTICULATES fixes to the Architect, and VERIFIES. This preserves fresh-context review: the Architect drafted the plan but never grades it; QA (who did not draft it) triages.
-
-Follow the Process above with these modifications:
-
-1. **Dispatch (step 1) is UNCHANGED** — dispatch the three fresh reviewers exactly as written, in a single message. Note: teammates CANNOT spawn other teammates, so these three reviewers MUST be classic **Agent-tool subagents** (not teammates). Fresh context is preserved because the subagents never saw the drafting.
-
-2. **Collect (step 2) is UNCHANGED.**
-
-3. **Triage — step 3's inline edit is SUSPENDED. Do NOT edit the plan.** Instead, for each finding:
-   - **Fix:** ARTICULATE the required change to the Architect via SendMessage — give `file:line`, exactly what to change, why, and the rule/rubric item cited — AND create one shared task-list item for that Fix (one item per Fix finding). The Architect claims the item, edits its own plan doc, marks the item done, and replies to you. You do NOT touch the plan.
-   - **Reject:** record the reason in one line in the disposition table (no message needed).
-   - **Defer:** record it in the disposition table with a pointer (follow-up plan, backlog, or a TODO task the Architect adds to the plan on your articulation).
-
-4. **Re-check interfaces (step 4) is UNCHANGED in intent** — after the Architect edits, VERIFY each fix against the original finding. If any fix touched a task's Interfaces (Produces/Consumes) section, re-dispatch ONLY the quality reviewer subagent on the updated plan. Loop (re-articulate → Architect edits → verify) until all Fix findings converge.
-
-5. **Output (step 5):** produce the findings-disposition table and report it to the LEAD (via SendMessage), not to the human. QA does not present the plan and does not run the human gate — the LEAD does.
-
-**Surface-to-the-LEAD redefinition.** Everywhere this skill says to "surface to the user," "record," or otherwise escalate (triage escalations, ambiguous findings), for teammates that means **SendMessage the LEAD** — teammates NEVER address the human directly for pipeline decisions; the LEAD is the sole human-facing router.
-
-**Architecture-level concerns block.** Any finding that would require an architecture-level change or deviation from the drafted approach is flagged to the LEAD (not decided by QA), and **QA BLOCKS until the LEAD acknowledges.** Because SendMessage delivery is not battle-tested, the fail-safe default on non-delivery is to STALL (never proceed unsupervised).
-
 ## Reviewer Rubrics
 
 > **Adapting the rubrics to your project:** The categories below are universal, but the concrete rule for each category lives in the project's conventions doc and codebase. Before dispatching, skim the conventions doc and note the project's specifics (its routing/handler convention, auth mechanism, ORM/schema conventions, logging style, migration registration, doc-sync requirements, commit-message format). Feed those specifics to the reviewers alongside the category. Where a category does not apply to the project (e.g., no multi-tenancy, no CLI), the reviewer skips it. Examples in each bullet are illustrative — replace them with the project's actual rule.
 
-> **Profile-driven dimensions (when invoked by ship-feature):** If a ship-feature domain **profile** is active (`ship-feature/profiles/*.md`), its reviewer slice is the source of truth for *which* dimensions to run. The three rubrics below are the `backend` profile. The `frontend` profile substitutes accessibility / responsive / design-fidelity / client-security for the Security rubric and keeps Quality + Standards; full-stack runs both sets plus the seam's contract-consistency / error-propagation / validation-parity checks. Read the active profile and dispatch one fresh reviewer per dimension it names (group related dimensions where sensible — the "three parallel reviewers" count is a default, not a fixed set); keep each reviewer fresh-context and single-focus.
+> **Profile-driven dimensions (when invoked by the feature pipeline):** If a domain **profile** is active (`~/.claude/skills/feature-pipeline/profiles/*.md`), its reviewer slice is the source of truth for *which* dimensions to run. The three rubrics below are the `backend` profile. The `frontend` profile substitutes accessibility / responsive / design-fidelity / client-security for the Security rubric and keeps Quality + Standards; full-stack runs both sets plus the seam's contract-consistency / error-propagation / validation-parity checks. Read the active profile and dispatch one fresh reviewer per dimension it names (group related dimensions where sensible — the "three parallel reviewers" count is a default, not a fixed set); keep each reviewer fresh-context and single-focus.
 
 ### Security Reviewer
 

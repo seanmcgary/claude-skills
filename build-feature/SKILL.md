@@ -1,32 +1,172 @@
 ---
 name: build-feature
-description: Use to execute a feature that has already been planned and flagged `status:ready-for-execution` in a GitHub issue, autonomously through to a review-ready pull request — implementation, commit review, and PR feedback. The hands-off execution half of ship-feature; after the flag it only requests human input on a blocker it cannot resolve on its own.
+description: Use to execute a feature that has already been planned and flagged `status:ready-for-execution` in a GitHub issue, autonomously through to a review-ready pull request — implementation, commit review, and PR feedback. The execution half of the feature pipeline; after the flag it only stops on a blocker it cannot resolve on its own.
 ---
 
 ## Overview
 
-This is **`ship-feature` stages 3–5 (Implementation, Commit Review, PR Feedback Loop) run in issue mode, with NO human gate.** The gate already happened during `plan-feature`, and the issue's `status:ready-for-execution` label IS that approval. build-feature reads the approved plan from the issue and drives it to a review-ready PR with minimal human interaction. Follow `ship-feature` exactly for those three stages; profiles, model tiering (executor on `claude-sonnet-5`, reviewers/orchestration on `claude-opus-5`), and the review cadence are inherited unchanged.
+`build-feature` takes an approved plan from a GitHub issue to a review-ready pull request. It
+runs standalone — it does not delegate to `ship-feature` — and it runs **hands-off**: the human
+gate already happened in `plan-feature`, and the `status:ready-for-execution` label IS that
+approval.
 
-**Precondition — the target issue MUST carry `status:ready-for-execution`.** That label is build-feature's authorization to execute, exactly as ship-feature's gate-approval token authorizes the Implementer. If the issue lacks the label, or has no approved plan, REFUSE and direct the user to `plan-feature`. Never plan, never re-open the gate here. (Normally the plan and a `## Pipeline State` block were written by plan-feature; if the plan was written into the issue by hand with no Pipeline State block, reconstruct one — infer the profile, assess the right-sizing class — before starting.)
+Shared reference — **read these at the paths below** (they are siblings of this skill, under
+`~/.claude/skills/feature-pipeline/`); do not redefine their contents here:
 
-## Autonomy: hands-off after the flag
+- `~/.claude/skills/feature-pipeline/conventions.md` — profiles, right-sizing, model tiering,
+  review cadence, no-bot repos, owner notifications
+- `~/.claude/skills/feature-pipeline/pipeline-state.md` — the handoff contract with
+  `plan-feature`
+- `~/.claude/skills/feature-pipeline/profiles/{backend,frontend,seam}.md` — per-domain slices
 
-Once the issue is flagged, proceed **fully autonomously** through stages 3–5. Do NOT ask permission to run tests, push, open the PR, or address a bot finding — triage and proceed per the sub-skills. The ONLY reason to stop and request human input is a blocker you cannot resolve on your own — ship-feature's Autonomy Contract, here comprising:
+**Model tiering:** orchestration and review triage on `claude-opus-5` (high effort); reviewer
+subagents on `claude-opus-5`; per-task implementer subagents on `claude-sonnet-5`. Always name
+the model explicitly when dispatching.
 
-- an implementation **BLOCKED** status you cannot fix (the plan is wrong or impossible, or a task cannot be completed as specified),
-- an **ambiguous or contentious** human comment (on the PR or the issue),
-- a required **architecture deviation** from the approved plan, or
-- the **PR round cap (N=3)** reached with actionable findings still open.
+## Preconditions
 
-When you hit a blocker: post it as an issue comment, set `status:blocked` on the issue (removing `status:ready-for-execution`; create the label if missing), and STOP with a status report. The run resumes when a human resolves the blocker and re-applies `status:ready-for-execution`.
+1. **The issue carries `status:ready-for-execution`.** That label is your authorization to write
+   code. Without it, REFUSE and direct the user to `plan-feature`. Never plan here, never
+   re-open the gate, never apply the label to yourself.
+2. **The issue has an approved plan with a `## Pipeline State` block.** If the block is missing,
+   REFUSE — do not reconstruct it. The fields you would have to guess (`branch`,
+   `design assets`) are precisely the ones that cause silent data loss when guessed wrong.
 
-## What to do
+## Phase 0 — Load state and resolve the branch
 
-1. **Check the precondition and load state.** Confirm the issue has `status:ready-for-execution`. Read the approved plan and the `## Pipeline State` block (profile, class, branch) from the issue, and materialize a local, UNCOMMITTED working copy of the plan for the executor tooling (`task-brief` / `review-package`). Ensure the feature branch (name from Pipeline State) exists — create it from the default branch if this is a fresh session/checkout; issue-mode planning produced no commits, so nothing is lost by (re)creating it.
-2. **Invoke `ship-feature` and RESUME at stage 3,** treating `status:ready-for-execution` as the gate-approval token:
-   - **Stage 3:** execute the plan (implementer subagents on `claude-sonnet-5`), applying the profile's executor slice and the Review Cadence (per-task review only for `review: yes` tasks; no separate SDD final review).
-   - **Stage 4:** the one authoritative whole-diff fan-out — profile-aware `reviewing-commits`, reviewers on `claude-opus-5`, scope-bounded re-reviews.
-   - **Stage 5:** open the PR (linking the issue via `Closes #<issue>`), flip the label `status:ready-for-execution` → `status:ready-for-review`, and run `pr-feedback-loop` (N=3).
-3. End with the final status report. **Never merge** — that stays a human decision.
+Read the plan and the `## Pipeline State` block: `class`, `profile`, `branch`, `pr`,
+`design assets`, `stage`. Load the profile file(s). Materialize a local, UNCOMMITTED working
+copy of the plan for executor tooling (`task-brief` / `review-package`).
 
-Do not re-specify models, profiles, or the cadence here; they come from `ship-feature`.
+**Resolve the branch — this is where work gets destroyed if you get it wrong:**
+
+```
+git fetch origin
+```
+
+- **If `branch` exists on origin: check it out.** It may already carry commits — `plan-feature`
+  creates the branch during planning and commits design assets onto it. Re-creating it from the
+  default branch silently discards them, and the build then has no design to match.
+- **Only if it genuinely does not exist on origin**, create it from the default branch.
+- Then rebase onto the default branch before new work. **If the rebase conflicts, STOP** and
+  report the conflicted files — never force, never guess a resolution.
+
+**Resolve the PR:** if `pr` names a draft, that PR is yours to finish — push to its branch and
+promote it at stage 5. Do **not** open a second PR for the same branch. If `pr` is `n/a`, you
+open the PR at stage 5.
+
+## Phase 1 — Design fidelity (before you write UI code)
+
+Every design source this plan depends on is **already a committed file on your branch**, listed
+in Pipeline State's `design assets` and cited by path in the plan. Read those files and
+implement what they specify.
+
+- **You do not fetch design.** No browser, no design tool, no design project. That sync happened
+  during planning, deliberately, so it could be reviewed before the gate.
+- **You do not reconstruct a design** from prose, screenshots, the issue title, or taste.
+- **If `design assets` is `none`,** the planner has asserted this feature has no visual surface.
+  Proceed.
+- **If the plan says "match the design" and the cited file is missing — or no path is cited, or
+  `design assets` is empty on a feature that plainly has UI — that is a BLOCKER.** Stop and ask
+  (see Autonomy contract). Shipping an approximation is a defect, not a partial success: it
+  costs a full rework round and reads to the reviewer as if the design was ignored.
+
+## Phase 2 — Implementation
+
+Execute the plan's checkbox tasks per the Right-Sizing class, applying the profile's **executor
+slice** to verify each one:
+
+- **Standard/Large:** `superpowers:subagent-driven-development` — a fresh implementer subagent
+  per task on `claude-sonnet-5` (batch only trivial tasks).
+- **Small:** execute inline with `superpowers:executing-plans`.
+
+Apply the **Review Cadence** from `conventions.md`: dispatch a per-task reviewer ONLY for tasks
+the plan tagged `review: yes` (on `claude-opus-5`); `review: no` tasks are gated by their own
+acceptance criteria. Do **not** run subagent-driven-development's separate final whole-branch
+review — the single authoritative fan-out is phase 3.
+
+Verification is domain-specific: backend is TDD + gates green; frontend additionally requires
+**observing the rendered result** — run the app, drive the real flow, screenshot at every
+breakpoint the plan named, check against the task's acceptance criteria, and tab through for
+keyboard reachability and visible focus. A visual task is never done on unit tests alone; if the
+environment cannot render the UI at all, that is a blocker to surface.
+
+Update Pipeline State on completion.
+
+## Phase 3 — Commit review
+
+This is the **one authoritative whole-diff fan-out**.
+
+- **Standard/Large:** invoke `reviewing-commits` on the feature branch — mechanical gates
+  (format, lint, test, typecheck), then three parallel **profile-aware** reviewers over the
+  branch diff on `claude-opus-5`. Triage, fix as commits, re-run gates. Re-reviews are
+  scope-bounded to each fix, never a fresh whole-diff pass.
+- **Small:** mechanical gates plus a real self-review against the profile's reviewer rubric.
+
+**Check for a PR review bot before deciding the weight** (see `conventions.md` → repositories
+without a PR review bot). If the repo has none, "the bot will catch it" is not available as a
+reason to review less: run the fan-out, or at absolute minimum gates + a genuine self-review.
+Never leave a diff with no review at all.
+
+Update Pipeline State on completion.
+
+## Phase 4 — PR + feedback loop
+
+**Ready the PR:**
+
+- **If Pipeline State names a draft `pr`:** push the branch, update the PR body to the full
+  description (format: `~/.claude/commands/generate-pr-description.md`), and promote it —
+  `gh pr ready <n>`.
+- **If `pr` is `n/a`:** push and open it now — `gh pr create --assignee seanmcgary` with the full
+  description, linking the issue via `Closes #<issue>`.
+
+Either way: assign `@seanmcgary`, @-mention him in the ready-for-review comment, then flip the
+issue's labels — remove `status:ready-for-execution`, add `status:ready-for-review`.
+
+**Run the feedback loop** (`pr-feedback-loop`, N=3 default). Triage findings, apply fixes, reply
+to threads, repeat until a clean round or the cap.
+
+**In a repo with no review bot, the only signals are CI status and human comments** — do not
+poll for a bot review that will never arrive. And in every repo, **do not block on slow CI for a
+clean-round exit**: wait for what actually drives the loop and for any check required for the
+exit decision; report completion with CI noted as in-progress rather than sitting in a blocking
+poll on multi-minute jobs.
+
+Update Pipeline State after each round, and end with a status report.
+
+## Autonomy contract
+
+After the gate, proceed **without asking permission**. Do NOT ask whether to run tests, push,
+open the PR, or address a finding — triage and proceed. Stop only for a blocker you cannot
+resolve on your own:
+
+1. **An implementation blocker you cannot fix** — the plan is wrong or impossible, or a task
+   cannot be completed as specified.
+2. **An ambiguous or contentious human comment** on the PR or the issue.
+3. **A required architecture deviation** from the approved plan — structural, not a minor fix.
+4. **The round cap reached** with actionable findings still open.
+5. **A missing or uncited design artifact** — the plan requires matching a design and the file
+   isn't there (see phase 1).
+
+When you hit one: commit and **push** your work first, then post the blocker as an issue comment
+@-mentioning `@seanmcgary`, set `status:needs-execution-input` (removing
+`status:ready-for-execution`), and STOP with a status report. The run resumes when a human
+resolves it and re-applies `status:ready-for-execution`.
+
+**Never merge.** That stays a human decision.
+
+## Red flags
+
+1. **"The branch doesn't matter, I'll just make it from master."** This deletes the design
+   assets `plan-feature` committed. Check out the remote branch.
+2. **"There's no design file, but I can tell what it should look like."** You cannot. That is
+   the exact failure mode this pipeline was restructured to prevent. Park and ask.
+3. **"I'll open a PR."** Check `pr` first — if a draft exists, promote it. Two PRs for one branch
+   is a mess someone else has to clean up.
+4. **"The tests pass so the code is fine."** Passing tests prove the happy path. Commit review
+   exists to catch what tests miss: security boundaries, convention violations, missing error
+   paths, a11y gaps, contract drift.
+5. **"I'll wait for the bot review."** Check whether this repo has one. If it doesn't, you will
+   wait forever.
+6. **"PR is open, my job is done."** Opening the PR starts the feedback loop; it does not end
+   the run.
