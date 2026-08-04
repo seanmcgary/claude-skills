@@ -108,6 +108,27 @@ the plan and record them in `design assets`. Nothing to sync.
 
 **If it does and the source is NOT committed**, materialize it now:
 
+0. **Check that `DesignSync` is actually available before relying on it.** Confirmed empirically
+   (2026-07-31): `DesignSync` is present and fully authorized (no consent prompt, real project
+   data) in a **foreground** dispatch — with or without `isolation: "worktree"` — but is **absent
+   entirely** (`ToolSearch` for `select:DesignSync` returns "No matching deferred tools found")
+   in **any background dispatch** (`run_in_background: true`), regardless of isolation. This is
+   an environment fact, not a consent or credential problem, and it cannot be worked around.
+   - Call `ToolSearch` with `select:DesignSync` as your first action in this phase. If it returns
+     the tool, proceed with step 1 below.
+   - **If it does not**, you are a background-dispatched agent and design sync is not something
+     you can do yourself in this run — full stop. Do **not** try to route around it: no raw
+     HTTP/JSON-RPC calls to any `design`/`api.anthropic.com` endpoint, no reading or refreshing
+     any OAuth/keychain credential (`designOauth` or otherwise), no browser automation. Any of
+     those is exactly the failure mode a prior incident produced (a rotated, unpersisted refresh
+     token that broke the human's stored design credential). Instead, PARK-BLOCKED immediately
+     with a comment containing the exact marker `DESIGN-SYNC-UNAVAILABLE-BACKGROUND` on its own
+     line, plus the project name/ID and file path(s) you need (from the issue text or your best
+     read of what's needed) so whoever handles it doesn't have to re-derive that. A loop
+     orchestrating you (see `docs/planning-loop.md` in a consuming repo, if present) should treat
+     this marker as routine and self-service it in a foreground step, not as a human decision to
+     wait on — but that is the orchestrator's job, not yours.
+
 1. **Pull the real source with the `design-sync` skill and the `DesignSync` tool** — never a
    browser, never memory, never a reconstruction from a screenshot or the issue text. Use
    `list_projects` → `list_files` to locate the file, then `get_file` to read it.
