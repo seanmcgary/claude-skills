@@ -25,7 +25,7 @@ A profile supplies three slices, each consumed by a different phase. **`plan-fea
 Backend verification is "tests green." Frontend adds **observe the rendered result** — the executor must actually look at the UI, not just pass unit tests. Discover the project's tooling rather than assuming one (repo-agnostic):
 
 1. **Run the app.** Use the `run` skill (or the project's dev/build script) to get the feature on screen.
-2. **Drive and observe.** Use the `verify` skill to exercise the real flow. For visual/interaction capture use `claude-in-chrome` or `playwright` if available; otherwise the project's e2e tool (Cypress/Playwright) or a component harness (Storybook). Screenshot at **each breakpoint the plan named** and check the render against the task's acceptance criteria — states present, no overflow, tokens matched.
+2. **Drive and observe.** Use the `verify` skill to exercise the real flow. For visual/interaction capture use the host's browser tool if available (`claude-in-chrome` under Claude; Playwright, or another browser-automation tool under other agents) — otherwise the project's e2e tool (Cypress/Playwright) or a component harness (Storybook). Screenshot at **each breakpoint the plan named** and check the render against the task's acceptance criteria — states present, no overflow, tokens matched.
 3. **Component/interaction tests.** Discover and use the project's test tooling (Vitest/Jest + Testing Library, Playwright, Cypress). Cover the interaction and each non-trivial state.
 4. **Accessibility check.** Tab through the feature: every control reachable, focus visible, order sensible. Run the project's a11y linter/`axe` if present.
 5. **Mechanical gates.** Run format/lint/test/typecheck as the backend profile does.

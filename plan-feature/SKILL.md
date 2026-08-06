@@ -10,17 +10,20 @@ approve." It runs standalone — it does not delegate to `ship-feature` — and 
 human gate**. It never implements.
 
 Shared reference — **read these at the paths below** (they are siblings of this skill, under
-`~/.claude/skills/feature-pipeline/`); do not redefine their contents here:
+`$SKILLS_ROOT/feature-pipeline/`; see the portability section in `conventions.md`); do not
+redefine their contents here:
 
-- `~/.claude/skills/feature-pipeline/conventions.md` — profiles, right-sizing, model tiering,
+- `$SKILLS_ROOT/feature-pipeline/conventions.md` — profiles, right-sizing, model tiering,
   review cadence, owner notifications
-- `~/.claude/skills/feature-pipeline/pipeline-state.md` — the handoff contract with
+- `$SKILLS_ROOT/feature-pipeline/pipeline-state.md` — the handoff contract with
   `build-feature`
-- `~/.claude/skills/feature-pipeline/profiles/{backend,frontend,seam}.md` — per-domain slices
+- `$SKILLS_ROOT/feature-pipeline/profiles/{backend,frontend,seam}.md` — per-domain slices
 
-**Model: `claude-opus-5` at high effort, for this session and every subagent you dispatch.**
-Planning is the highest-leverage work in the pipeline; there is no cheap path through it. Always
-name the model explicitly when dispatching — an omission silently inherits the caller's model.
+**Model: this pipeline plans at the `senior` tier (see `$SKILLS_ROOT/feature-pipeline/tiers.md`),**
+for this session and every subagent you dispatch. Planning is the highest-leverage work in the
+pipeline; there is no cheap path through it. Resolve the `senior` model and pass it explicitly
+when dispatching — or omit it to inherit the invoking agent's model when resolution falls back
+to `inherit`.
 
 ## Preconditions
 
@@ -48,7 +51,7 @@ what has already been asked and answered; never re-ask a question the thread alr
 
 ## Phase 1 — Premise & blast-radius check
 
-Run the shared check at `~/.claude/skills/feature-pipeline/premise-check.md`. It defines what to
+Run the shared check at `$SKILLS_ROOT/feature-pipeline/premise-check.md`. It defines what to
 answer, the three outcomes, and — importantly — what is NOT a premise failure. Do not restate it
 here.
 
@@ -59,7 +62,8 @@ stale — is reconciled in the plan and is not a block.
 
 ## Phase 2 — Brainstorm + spec
 
-Invoke `superpowers:brainstorming` to explore design space, requirements, and edge cases,
+Invoke `brainstorming` (the host's design-exploration skill; see the sub-skill intent map in
+`conventions.md`) to explore design space, requirements, and edge cases,
 informed by the phase-1 findings, then write a spec as an issue comment. Write the spec in
 **Simplified Technical English (ASD-STE100)** — see the writing-style section in `conventions.md`.
 
@@ -132,10 +136,11 @@ the plan and record them in `design assets`. Nothing to sync.
 
 ## Phase 4 — Write the plan
 
-Invoke `superpowers:writing-plans`, layering the **house plan style** on top. Write all plan
+Invoke `writing-plans` (the host's plan-authoring skill), layering the **house plan style** on
+top. Write all plan
 prose in **Simplified Technical English (ASD-STE100)** — see the writing-style section in
 `conventions.md`. **The plan's required structure is shared** — see
-`~/.claude/skills/feature-pipeline/plan-structure.md` for the Global Constraints preamble,
+`$SKILLS_ROOT/feature-pipeline/plan-structure.md` for the Global Constraints preamble,
 `Verified external API`, the checkbox/agentic-worker header, and profile-shaped tasks. Do not
 restate it here.
 
@@ -153,7 +158,7 @@ Then initialize or update the `## Pipeline State` block per `pipeline-state.md`.
 ## Phase 5 — Plan review
 
 Per the Right-Sizing class, using the active profile's **reviewer slice** for dimensions, with
-all reviewers on `claude-opus-5` at high effort:
+all reviewers at the `senior` tier (resolved per `$SKILLS_ROOT/feature-pipeline/tiers.md`):
 
 - **Standard/Large:** invoke `reviewing-plans` — three profile-aware reviewers.
 - **Small:** one combined-dimension pass, unless the premise check flagged risk, in which case

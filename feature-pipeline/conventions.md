@@ -4,8 +4,33 @@ Shared reference for `plan-feature` and `build-feature`. This file defines **how
 skills scale their work and address the owner. It contains no stages and orchestrates nothing —
 each skill runs its own phases end to end and loads this for the rules below.
 
-Companion files: [`pipeline-state.md`](pipeline-state.md) (the handoff contract) and
-[`profiles/`](profiles/) (per-domain slices).
+Companion files: [`pipeline-state.md`](pipeline-state.md) (the handoff contract),
+[`profiles/`](profiles/) (per-domain slices), and [`tiers.md`](tiers.md) (the model resolver).
+
+## Portability across agents
+
+These skills are agent-agnostic. They reference a **skills root** and **sub-skill intents**, not
+agent-specific paths or tool names.
+
+- **Skills root (`$SKILLS_ROOT`).** Resolve `$SKILLS_ROOT` to the directory that holds this
+  `feature-pipeline/` package. Under Claude Code it is `~/.claude/skills`; under Pi it is the pi
+  skills path; under other agents, wherever these skills are installed. Replace `$SKILLS_ROOT`
+  with the actual path for the running agent before reading a referenced file.
+- **Sub-skill intents.** The pipeline names sub-skills by the **work they do**, then invokes the
+  host's implementation of that intent. The canonical map:
+
+  | Intent | What it does | Implementations |
+  |--------|--------------|-----------------|
+  | `subagent-driven-development` | execute a plan across fresh per-task subagents | Claude: `superpowers:subagent-driven-development`; Pi: `pi-subagents` parallel dispatch |
+  | `executing-plans` | execute a plan inline in the current session | Claude: `superpowers:executing-plans`; Pi: native plan execution |
+  | `reviewing-plans` | fresh-context reviewer fan-out over a plan | Claude: `superpowers:reviewing-plans`; Pi: `pi-subagents` reviewer fan-out |
+  | `reviewing-commits` | fresh-context reviewer fan-out over a diff | Claude: `superpowers:reviewing-commits`; Pi: `pi-subagents` reviewer fan-out |
+  | `brainstorming` / `writing-plans` | design exploration / plan authoring | Claude: `superpowers:brainstorming` / `superpowers:writing-plans`; Pi: native equivalents |
+
+  Where a skill below spells out `superpowers:<name>`, read it as "invoke the host's
+  `<name>` implementation" — the work is the same under every agent.
+- **PR review bot.** The review source is detected per repo, not assumed to be a specific bot
+  (see `pr-feedback-loop` and the "repositories without a PR review bot" rule below).
 
 ## Profiles: scale to the domain
 
@@ -50,7 +75,7 @@ When unsure, pick the heavier class.
 | **Brainstorm** | premise check + confirm approach in one exchange | full brainstorming | full brainstorming + decompose |
 | **Plan** | lightweight (still house style; tasks may be coarse) | full plan | full plan |
 | **Plan review** | ONE reviewer pass (combined dimensions), unless the premise check flagged risk | three-dimension `reviewing-plans` | three-dimension `reviewing-plans` |
-| **Implementation** | inline (`superpowers:executing-plans`), no per-task subagent relay | subagent-driven, batch trivial tasks | subagent-driven, one task per subagent |
+| **Implementation** | inline (`executing-plans`), no per-task subagent relay | subagent-driven, batch trivial tasks | subagent-driven, one task per subagent |
 | **Commit review** | mechanical gates + one self-review against the profile rubric | the whole-diff fan-out: profile-aware `reviewing-commits` | the whole-diff fan-out |
 
 You may **right-size** a review; you may never **skip** it. Neither may you skip the premise
@@ -60,24 +85,29 @@ then blesses.
 
 ## Model tiering: senior plans, mid executes, senior reviews
 
-| Work | Tier | Model | Effort |
-|------|------|-------|--------|
-| Planning — premise check, brainstorm, design sync, plan authoring (`plan-feature`; `ship-feature` stage 1) | senior | `claude-opus-5` | **high** |
-| Reviewer subagents — plan review and commit review | senior | `claude-opus-5` | high |
-| Per-task implementation (`build-feature`; `ship-feature` stage 3) | mid | `claude-sonnet-5` | default |
-| Orchestration + review triage | senior | `claude-opus-5` | high |
+Skills name **tiers**, never concrete models. [`tiers.md`](tiers.md) resolves each tier to a
+concrete model for the running agent (or inherits the session's model). This keeps the pipeline
+provider-agnostic — the same tier means the same thing under Claude, OpenAI, Gemini, or any
+other agent.
 
-**`plan-feature` runs entirely on `claude-opus-5` at high effort — the orchestrating session and
-every subagent it dispatches.** Planning is the highest-leverage step in the pipeline: a
-well-specified plan is what lets a mid-level executor produce correct code without heavy
+| Work | Tier | Effort |
+|------|------|--------|
+| Planning — premise check, brainstorm, design sync, plan authoring (`plan-feature`; `ship-feature` stage 1) | senior | **high** |
+| Reviewer subagents — plan review and commit review | senior | high |
+| Per-task implementation (`build-feature`; `ship-feature` stage 3) | mid | default |
+| Orchestration + review triage | senior | high |
+
+**`plan-feature` runs entirely at the `senior` tier — the orchestrating session and every
+subagent it dispatches.** Planning is the highest-leverage step in the pipeline: a
+well-specified plan is what lets a mid-tier executor produce correct code without heavy
 per-task review. There is no cheap path through planning, and no task within it is "mechanical
 enough" to downgrade.
 
-**Always specify the model explicitly when dispatching a subagent.** An omitted model inherits
-the session's model and silently defeats this tiering — nothing errors, you just get worse
-output. Note the Agent tool's `model` parameter takes a short alias, not a full model ID:
-pass `"opus"` where this table says `claude-opus-5` and `"sonnet"` where it says
-`claude-sonnet-5`.
+**Resolve the model, then dispatch.** Read `tiers.md` and resolve this run's `senior` / `mid`
+model per the resolver: provider row → env override → inherit. When resolution yields a model,
+pass it explicitly when dispatching a subagent. When it resolves to `inherit`, **omit** the
+model parameter so the subagent inherits the invoking session's model — that is the intended
+fallback for an unmapped agent, not a silent defeat of the tiering.
 
 If the executor struggles, the fix is a better-specified plan — not a more expensive executor.
 

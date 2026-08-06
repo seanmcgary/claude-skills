@@ -19,11 +19,12 @@ human gate) and then `build-feature` (execution → review-ready PR). Those two 
 the issue and its `status:*` labels, keep the spec and plan as issue comments, and sync design
 assets before the gate. This skill has no issue mode.
 
-Shared reference — **read these at the paths below**; do not redefine their contents here:
+Shared reference — **read these at the paths below** (see the portability section in
+`conventions.md`); do not redefine their contents here:
 
-- `~/.claude/skills/feature-pipeline/conventions.md` — profiles, right-sizing, model tiering,
+- `$SKILLS_ROOT/feature-pipeline/conventions.md` — profiles, right-sizing, model tiering,
   review cadence, repos without a review bot, owner notifications
-- `~/.claude/skills/feature-pipeline/profiles/{backend,frontend,seam}.md` — per-domain slices
+- `$SKILLS_ROOT/feature-pipeline/profiles/{backend,frontend,seam}.md` — per-domain slices
 
 **Stages:**
 
@@ -75,16 +76,17 @@ digraph pipeline {
 `## Pipeline State` block shows stage >= 2, skip to the indicated stage (see Resume).
 
 **0. Premise & blast-radius check — do this FIRST, by reading code, not assumption.** Run the
-shared check at `~/.claude/skills/feature-pipeline/premise-check.md`: what to answer, the three
+shared check at `$SKILLS_ROOT/feature-pipeline/premise-check.md`: what to answer, the three
 outcomes, and what is NOT a premise failure. Do not restate it here.
 
 Specific to this skill: the human is present, so a contradiction between the user's framing and
 the code is usually resolved by asking in one exchange rather than parking. Outcome 2 there —
 premise holds, details are stale — is reconciled in the plan and is never a stop.
 
-**1. Brainstorm + spec.** Invoke `superpowers:brainstorming` to explore design space,
-requirements, and edge cases, informed by the step-0 findings, then write a spec in **Simplified
-Technical English (ASD-STE100)** — see the writing-style section in `conventions.md`.
+**1. Brainstorm + spec.** Invoke `brainstorming` (the host's design-exploration skill) to
+explore design space, requirements, and edge cases, informed by the step-0 findings, then write
+a spec in **Simplified Technical English (ASD-STE100)** — see the writing-style section in
+`conventions.md`.
 **Small changes:** skip both brainstorming and the written spec once the premise check is clean
 and the approach is unambiguous — the plan doubles as the spec. If a spec already exists (user
 provides a path, or one exists at `docs/superpowers/specs/`), skip brainstorming and go to the
@@ -92,9 +94,9 @@ plan — but still run the premise check against it. For a borderline Small/Stan
 approach is clear but not trivial, confirm the approach in one exchange rather than the full
 one-question-at-a-time ceremony.
 
-**2. Write the plan.** Invoke `superpowers:writing-plans`, layering the **house plan style** on
+**2. Write the plan.** Invoke `writing-plans` (the host's plan-authoring skill), layering the **house plan style** on
 top, in **Simplified Technical English (ASD-STE100)**. **The plan's required structure is
-shared** — see `~/.claude/skills/feature-pipeline/plan-structure.md` for the Global Constraints
+shared** — see `$SKILLS_ROOT/feature-pipeline/plan-structure.md` for the Global Constraints
 preamble, `Verified external API`, the checkbox/agentic-worker header, and profile-shaped tasks.
 Do not restate it here.
 
@@ -125,7 +127,8 @@ stage-5 rounds. It stays a draft until stage 5.
 ### Stage 2: Plan Review + Human Gate
 
 1. Review the plan per the Right-Sizing class, using the active profile's **reviewer slice** for
-   dimensions, with reviewers on `claude-opus-5`: **Standard/Large** invoke `reviewing-plans`;
+   dimensions, with reviewers at the `senior` tier (resolved per `conventions.md` → `tiers.md`):
+   **Standard/Large** invoke `reviewing-plans`;
    **Small** run one combined-dimension pass, unless the premise check flagged risk, in which
    case escalate to the full `reviewing-plans`. A review of some weight always runs before the
    gate.
@@ -142,16 +145,17 @@ stage-5 rounds. It stays a draft until stage 5.
 
 ### Stage 3: Implementation
 
-1. Execute the plan per the Right-Sizing class, spawning implementer subagents on
-   `claude-sonnet-5`: **Standard/Large** invoke `superpowers:subagent-driven-development` (fresh
+1. Execute the plan per the Right-Sizing class, spawning implementer subagents at the `mid`
+   tier (resolved per `conventions.md` → `tiers.md`): **Standard/Large** invoke
+   `subagent-driven-development` (fresh
    subagent per task, batching only trivial tasks); **Small** execute inline with
-   `superpowers:executing-plans`. Either way, follow the plan's checkbox tasks and apply the
+   `executing-plans`. Either way, follow the plan's checkbox tasks and apply the
    profile's **executor slice** to verify each — backend: TDD + gates green; frontend: run the
    app, drive it, screenshot at the plan's breakpoints, a11y check, gates; full-stack: also
    verify the seam end-to-end (real UI action → real API → real data layer).
-2. Apply the **Review Cadence**: dispatch a per-task reviewer (on `claude-opus-5`) ONLY for tasks
-   tagged `review: yes`; `review: no` tasks are gated by their own acceptance criteria. Do NOT
-   run subagent-driven-development's final whole-branch review — stage 4 is the single fan-out.
+2. Apply the **Review Cadence**: dispatch a per-task reviewer (at the `senior` tier) ONLY for
+tasks tagged `review: yes`; `review: no` tasks are gated by their own acceptance criteria. Do NOT
+run subagent-driven-development's final whole-branch review — stage 4 is the single fan-out.
    Any re-review is scope-bounded to the fix.
 3. Update Pipeline State.
 
@@ -159,8 +163,8 @@ stage-5 rounds. It stays a draft until stage 5.
 
 1. This is the **one authoritative whole-diff fan-out**:
    - **Standard/Large:** invoke `reviewing-commits` on the feature branch — mechanical gates
-     (format, lint, test), then three parallel **profile-aware** reviewers over the branch diff on
-     `claude-opus-5`; triage, fix as commits, re-run gates. Re-reviews are scope-bounded. Stage 3
+     (format, lint, test), then three parallel **profile-aware** reviewers over the branch diff at
+     the `senior` tier; triage, fix as commits, re-run gates. Re-reviews are scope-bounded. Stage 3
      skipped SDD's final review precisely so this is the single fan-out — do not look for a prior
      whole-branch review to dedupe against.
    - **Small:** mechanical gates plus a single self-review against the profile's reviewer rubric.
@@ -174,7 +178,8 @@ stage-5 rounds. It stays a draft until stage 5.
 
 1. **Ready the PR.** The draft already exists from stage 1: push the implementation + stage-4
    commits, update the PR body to the full description (format:
-   `~/.claude/commands/generate-pr-description.md`), mark it ready (`gh pr ready <n>`), assign
+   `$SKILLS_ROOT/../commands/generate-pr-description.md`, the host's PR-description generator),
+   mark it ready (`gh pr ready <n>`), assign
    `@seanmcgary` (`gh pr edit <n> --add-assignee seanmcgary`), and @-mention him in the
    ready-for-review note. Fall back to `gh pr create` only if no PR exists (a no-remote run that
    skipped the stage-1 draft).

@@ -5,7 +5,7 @@ description: Use when taking a feature that spans both UI and server (e.g. a new
 
 ## Overview
 
-This is **`ship-feature` with both the `frontend` and `backend` profiles pinned, plus the `seam` addendum.** It is not a separate pipeline. Follow `ship-feature` exactly — its five stages, the single human gate, the autonomy contract, and everything it inherits from `~/.claude/skills/feature-pipeline/conventions.md` (right-sizing, model tiering, review cadence) apply unchanged.
+This is **`ship-feature` with both the `frontend` and `backend` profiles pinned, plus the `seam` addendum.** It is not a separate pipeline. Follow `ship-feature` exactly — its five stages, the single human gate, the autonomy contract, and everything it inherits from `$SKILLS_ROOT/feature-pipeline/conventions.md` (right-sizing, model tiering, review cadence) apply unchanged.
 
 The only difference: **both** profiles are active, and the `seam` addendum (the client/server contract) applies on top. Skip ship-feature's profile-inference step — the profiles are pinned by this entry point.
 
@@ -17,7 +17,7 @@ The only difference: **both** profiles are active, and the `seam` addendum (the 
 
 1. Invoke `ship-feature` and run its pipeline as written.
 2. Set the Pipeline State `profile` field to `frontend+backend+seam`.
-3. At the start of stages 1, 3, and 4, read `~/.claude/skills/feature-pipeline/profiles/frontend.md`, `~/.claude/skills/feature-pipeline/profiles/backend.md`, and `~/.claude/skills/feature-pipeline/profiles/seam.md`, and apply **all three** matching slices:
+3. At the start of stages 1, 3, and 4, read `$SKILLS_ROOT/feature-pipeline/profiles/frontend.md`, `$SKILLS_ROOT/feature-pipeline/profiles/backend.md`, and `$SKILLS_ROOT/feature-pipeline/profiles/seam.md`, and apply **all three** matching slices:
    - **Planner (stage 1):** author both frontend and backend task shapes; run right-sizing with both trigger sets; fix the API contract first (seam) so both sides build to it.
    - **Executor (stage 3):** verify each task per its profile (tests for server tasks, render/screenshot for UI tasks), and verify the seam **end-to-end** — real UI action → real API → real data layer.
    - **Reviewer (stages 2 & 4):** run the combined rubric — backend security + frontend a11y/responsive/design-fidelity/client-security + the seam's contract-consistency/error-propagation/validation-parity dimensions.

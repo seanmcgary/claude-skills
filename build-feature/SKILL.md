@@ -11,17 +11,19 @@ gate already happened in `plan-feature`, and the `status:ready-for-execution` la
 approval.
 
 Shared reference — **read these at the paths below** (they are siblings of this skill, under
-`~/.claude/skills/feature-pipeline/`); do not redefine their contents here:
+`$SKILLS_ROOT/feature-pipeline/`; see the portability section in `conventions.md`); do not
+redefine their contents here:
 
-- `~/.claude/skills/feature-pipeline/conventions.md` — profiles, right-sizing, model tiering,
+- `$SKILLS_ROOT/feature-pipeline/conventions.md` — profiles, right-sizing, model tiering,
   review cadence, no-bot repos, owner notifications
-- `~/.claude/skills/feature-pipeline/pipeline-state.md` — the handoff contract with
+- `$SKILLS_ROOT/feature-pipeline/pipeline-state.md` — the handoff contract with
   `plan-feature`
-- `~/.claude/skills/feature-pipeline/profiles/{backend,frontend,seam}.md` — per-domain slices
+- `$SKILLS_ROOT/feature-pipeline/profiles/{backend,frontend,seam}.md` — per-domain slices
 
-**Model tiering:** orchestration and review triage on `claude-opus-5` (high effort); reviewer
-subagents on `claude-opus-5`; per-task implementer subagents on `claude-sonnet-5`. Always name
-the model explicitly when dispatching.
+**Model tiering:** orchestration and review triage at the `senior` tier (high effort); reviewer
+subagents at `senior`; per-task implementer subagents at `mid`. Resolve each model per
+`$SKILLS_ROOT/feature-pipeline/tiers.md` and pass it explicitly when dispatching — or omit it
+to inherit the invoking session's model when resolution falls back to `inherit`.
 
 ## Preconditions
 
@@ -76,12 +78,12 @@ implement what they specify.
 Execute the plan's checkbox tasks per the Right-Sizing class, applying the profile's **executor
 slice** to verify each one:
 
-- **Standard/Large:** `superpowers:subagent-driven-development` — a fresh implementer subagent
-  per task on `claude-sonnet-5` (batch only trivial tasks).
-- **Small:** execute inline with `superpowers:executing-plans`.
+- **Standard/Large:** `subagent-driven-development` — a fresh implementer subagent per task at
+  the `mid` tier (batch only trivial tasks).
+- **Small:** execute inline with `executing-plans`.
 
 Apply the **Review Cadence** from `conventions.md`: dispatch a per-task reviewer ONLY for tasks
-the plan tagged `review: yes` (on `claude-opus-5`); `review: no` tasks are gated by their own
+the plan tagged `review: yes` (at the `senior` tier); `review: no` tasks are gated by their own
 acceptance criteria. Do **not** run subagent-driven-development's separate final whole-branch
 review — the single authoritative fan-out is phase 3.
 
@@ -99,7 +101,7 @@ This is the **one authoritative whole-diff fan-out**.
 
 - **Standard/Large:** invoke `reviewing-commits` on the feature branch — mechanical gates
   (format, lint, test, typecheck), then three parallel **profile-aware** reviewers over the
-  branch diff on `claude-opus-5`. Triage, fix as commits, re-run gates. Re-reviews are
+  branch diff at the `senior` tier. Triage, fix as commits, re-run gates. Re-reviews are
   scope-bounded to each fix, never a fresh whole-diff pass.
 - **Small:** mechanical gates plus a real self-review against the profile's reviewer rubric.
 
@@ -115,7 +117,8 @@ Update Pipeline State on completion.
 **Ready the PR:**
 
 - **If Pipeline State names a draft `pr`:** push the branch, update the PR body to the full
-  description (format: `~/.claude/commands/generate-pr-description.md`), and promote it —
+  description (format: `$SKILLS_ROOT/../commands/generate-pr-description.md`, the host's
+  PR-description generator), and promote it —
   `gh pr ready <n>`.
 - **If `pr` is `n/a`:** push and open it now — `gh pr create --assignee seanmcgary` with the full
   description, linking the issue via `Closes #<issue>`.
