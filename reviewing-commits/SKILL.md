@@ -27,7 +27,9 @@ Discover the project's format, lint, and test commands from its conventions doc 
 
 1. **Format** -- run the formatter; if any files change, commit them (`fix: format code`).
 2. **Lint** -- run the linter; must produce 0 issues. If there are findings, fix them and commit (`fix: resolve lint findings`). Re-run until clean.
-3. **Test** -- run the full test suite. If tests fail, fix and commit. Re-run until green.
+3. **Test** -- run the full test suite. This is the pipeline's **single full-suite run**
+   (per-task runs were targeted — see "Test cadence" in `conventions.md`); it exists to catch
+   cross-task regressions. If tests fail, fix and commit. Re-run until green.
 
 Only proceed to the reviewer dispatch once all three gates are green.
 

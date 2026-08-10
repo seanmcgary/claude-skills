@@ -23,7 +23,7 @@ Shared reference — **read these at the paths below** (see the portability sect
 `conventions.md`); do not redefine their contents here:
 
 - `$SKILLS_ROOT/feature-pipeline/conventions.md` — profiles, right-sizing, model tiering,
-  review cadence, repos without a review bot, owner notifications
+  review cadence, test cadence, repos without a review bot, owner notifications
 - `$SKILLS_ROOT/feature-pipeline/profiles/{backend,frontend,seam}.md` — per-domain slices
 
 **Stages:**
@@ -94,8 +94,8 @@ plan — but still run the premise check against it. For a borderline Small/Stan
 approach is clear but not trivial, confirm the approach in one exchange rather than the full
 one-question-at-a-time ceremony.
 
-**2. Write the plan.** Invoke `writing-plans` (the host's plan-authoring skill), layering the **house plan style** on
-top, in **Simplified Technical English (ASD-STE100)**. **The plan's required structure is
+**2. Write the plan.** Invoke `writing-plans` (the host's plan-authoring skill), layering the
+**house plan style** on top, in **Simplified Technical English (ASD-STE100)**. **The plan's required structure is
 shared** — see `$SKILLS_ROOT/feature-pipeline/plan-structure.md` for the Global Constraints
 preamble, `Verified external API`, the checkbox/agentic-worker header, and profile-shaped tasks.
 Do not restate it here.
@@ -128,8 +128,7 @@ stage-5 rounds. It stays a draft until stage 5.
 
 1. Review the plan per the Right-Sizing class, using the active profile's **reviewer slice** for
    dimensions, with reviewers at the `senior` tier (resolved per `conventions.md` → `tiers.md`):
-   **Standard/Large** invoke `reviewing-plans`;
-   **Small** run one combined-dimension pass, unless the premise check flagged risk, in which
+   **Standard/Large** invoke `reviewing-plans`; **Small** run one combined-dimension pass, unless the premise check flagged risk, in which
    case escalate to the full `reviewing-plans`. A review of some weight always runs before the
    gate.
 2. Apply the review's fixes to the plan inline.
@@ -147,25 +146,28 @@ stage-5 rounds. It stays a draft until stage 5.
 
 1. Execute the plan per the Right-Sizing class, spawning implementer subagents at the `mid`
    tier (resolved per `conventions.md` → `tiers.md`): **Standard/Large** invoke
-   `subagent-driven-development` (fresh
-   subagent per task, batching only trivial tasks); **Small** execute inline with
-   `executing-plans`. Either way, follow the plan's checkbox tasks and apply the
-   profile's **executor slice** to verify each — backend: TDD + gates green; frontend: run the
-   app, drive it, screenshot at the plan's breakpoints, a11y check, gates; full-stack: also
-   verify the seam end-to-end (real UI action → real API → real data layer).
+   `subagent-driven-development` (fresh subagent per task, batching only trivial tasks);
+   **Small** execute inline with `executing-plans`. Either way, follow the plan's checkbox tasks
+   and apply the
+   profile's **executor slice** to verify each — backend: TDD + targeted tests green (the full
+   suite runs once at stage 4; see the "Test cadence" section in `conventions.md`); frontend: run
+   the app, drive it, screenshot at the plan's breakpoints, a11y check, fast gates; full-stack:
+   also verify the seam end-to-end (real UI action → real API → real data layer).
 2. Apply the **Review Cadence**: dispatch a per-task reviewer (at the `senior` tier) ONLY for
-tasks tagged `review: yes`; `review: no` tasks are gated by their own acceptance criteria. Do NOT
-run subagent-driven-development's final whole-branch review — stage 4 is the single fan-out.
-   Any re-review is scope-bounded to the fix.
+   tasks tagged `review: yes`; `review: no` tasks are gated by their own acceptance criteria. Do
+   NOT run subagent-driven-development's final whole-branch review — stage 4 is the single
+   fan-out. Any re-review is scope-bounded to the fix.
 3. Update Pipeline State.
 
 ### Stage 4: Commit Review
 
 1. This is the **one authoritative whole-diff fan-out**:
    - **Standard/Large:** invoke `reviewing-commits` on the feature branch — mechanical gates
-     (format, lint, test), then three parallel **profile-aware** reviewers over the branch diff at
-     the `senior` tier; triage, fix as commits, re-run gates. Re-reviews are scope-bounded. Stage 3
-     skipped SDD's final review precisely so this is the single fan-out — do not look for a prior
+     (format, lint, then the **full** test suite — the run's one full-suite pass; per-task
+     runs were targeted), then three parallel **profile-aware** reviewers over the branch diff
+     at the `senior` tier; triage, fix as commits, re-run gates. Re-reviews are scope-bounded.
+     Stage 3 skipped SDD's final review precisely so this is the single fan-out — do not look for
+     a prior
      whole-branch review to dedupe against.
    - **Small:** mechanical gates plus a single self-review against the profile's reviewer rubric.
 2. **Check whether this repo has a PR review bot** before settling on the lighter path — see

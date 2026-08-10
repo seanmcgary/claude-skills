@@ -15,7 +15,7 @@ Shared reference — **read these at the paths below** (they are siblings of thi
 redefine their contents here:
 
 - `$SKILLS_ROOT/feature-pipeline/conventions.md` — profiles, right-sizing, model tiering,
-  review cadence, no-bot repos, owner notifications
+  review cadence, test cadence, no-bot repos, owner notifications
 - `$SKILLS_ROOT/feature-pipeline/pipeline-state.md` — the handoff contract with
   `plan-feature`
 - `$SKILLS_ROOT/feature-pipeline/profiles/{backend,frontend,seam}.md` — per-domain slices
@@ -87,7 +87,10 @@ the plan tagged `review: yes` (at the `senior` tier); `review: no` tasks are gat
 acceptance criteria. Do **not** run subagent-driven-development's separate final whole-branch
 review — the single authoritative fan-out is phase 3.
 
-Verification is domain-specific: backend is TDD + gates green; frontend additionally requires
+Verification is domain-specific, and per task it runs **targeted tests only** — the new and
+affected tests plus format/lint/typecheck; the full suite runs once at phase 3 (see the "Test
+cadence" section in `conventions.md`). Backend: TDD + targeted tests green; frontend
+additionally requires
 **observing the rendered result** — run the app, drive the real flow, screenshot at every
 breakpoint the plan named, check against the task's acceptance criteria, and tab through for
 keyboard reachability and visible focus. A visual task is never done on unit tests alone; if the
@@ -100,7 +103,8 @@ Update Pipeline State on completion.
 This is the **one authoritative whole-diff fan-out**.
 
 - **Standard/Large:** invoke `reviewing-commits` on the feature branch — mechanical gates
-  (format, lint, test, typecheck), then three parallel **profile-aware** reviewers over the
+  (format, lint, then the **full** test suite — the run's one full-suite pass; per-task runs
+  were targeted), and typecheck, then three parallel **profile-aware** reviewers over the
   branch diff at the `senior` tier. Triage, fix as commits, re-run gates. Re-reviews are
   scope-bounded to each fix, never a fresh whole-diff pass.
 - **Small:** mechanical gates plus a real self-review against the profile's reviewer rubric.

@@ -130,6 +130,29 @@ find NEW findings in. This cadence keeps review value high while making the loop
 If a task feels like it needs its own reviewer, the fix is to tag it `review: yes` **in the
 plan** — decided by the senior planner up front, not improvised mid-execution.
 
+## Test cadence: targeted per task, full suite at commit review
+
+Running the full test suite on every task is the pipeline's biggest time sink, and it rarely
+catches anything per task that a targeted run misses. Test in two weights:
+
+- **Per task (implementation): targeted tests only.** Each task runs the tests it introduces or
+  touches — the new covering test(s) plus any existing test the change can affect — and the fast
+  mechanical gates (format, lint, typecheck). Do **not** run the full suite per task. "Gates
+  green" at task level means: this task's targeted tests pass and format/lint/typecheck are
+  clean.
+- **Full suite (commit review): once, and only once.** The full suite runs as the final
+  mechanical gate at commit review (`reviewing-commits`; `ship-feature` stage 4 /
+  `build-feature` phase 3) — the one phase that owns whole-branch verification. If it fails,
+  fix the regression before promoting the PR. A cross-task regression surfacing there is a
+  normal outcome of the cadence, not a failure of the per-task runs.
+- **PR feedback loop:** per fix, run format/lint plus the tests covering the changed code. Each
+  push runs the full suite in CI; do not re-run the full suite locally every round unless it is
+  cheap.
+
+Targeted now, full later: per-task runs give fast signal while the task is fresh; the full suite
+at the end catches cross-task interaction exactly once, in the phase that already owns
+whole-branch verification.
+
 ## Repositories without a PR review bot
 
 Some repos (including `mcgarylabs/lawndominator-monorepo`) have **no automated PR reviewer**.

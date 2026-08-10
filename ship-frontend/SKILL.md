@@ -8,7 +8,7 @@ description: Use when taking a frontend/UI feature from idea or spec all the way
 This is **`ship-feature` with the `frontend` profile pinned.** It is not a separate pipeline.
 Follow `ship-feature` exactly — its five stages, the single human gate, the autonomy contract,
 and everything it inherits from `$SKILLS_ROOT/feature-pipeline/conventions.md` (right-sizing,
-model tiering, review cadence) apply unchanged.
+model tiering, test cadence, review cadence) apply unchanged.
 
 The only difference: the active profile is **`frontend`**, not the default `backend`. Skip
 `ship-feature`'s profile-inference step — the profile is pinned by this entry point.

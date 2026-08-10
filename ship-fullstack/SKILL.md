@@ -5,7 +5,7 @@ description: Use when taking a feature that spans both UI and server (e.g. a new
 
 ## Overview
 
-This is **`ship-feature` with both the `frontend` and `backend` profiles pinned, plus the `seam` addendum.** It is not a separate pipeline. Follow `ship-feature` exactly — its five stages, the single human gate, the autonomy contract, and everything it inherits from `$SKILLS_ROOT/feature-pipeline/conventions.md` (right-sizing, model tiering, review cadence) apply unchanged.
+This is **`ship-feature` with both the `frontend` and `backend` profiles pinned, plus the `seam` addendum.** It is not a separate pipeline. Follow `ship-feature` exactly — its five stages, the single human gate, the autonomy contract, and everything it inherits from `$SKILLS_ROOT/feature-pipeline/conventions.md` (right-sizing, model tiering, test cadence, review cadence) apply unchanged.
 
 The only difference: **both** profiles are active, and the `seam` addendum (the client/server contract) applies on top. Skip ship-feature's profile-inference step — the profiles are pinned by this entry point.
 

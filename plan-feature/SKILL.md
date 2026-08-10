@@ -14,7 +14,7 @@ Shared reference — **read these at the paths below** (they are siblings of thi
 redefine their contents here:
 
 - `$SKILLS_ROOT/feature-pipeline/conventions.md` — profiles, right-sizing, model tiering,
-  review cadence, owner notifications
+  review cadence, test cadence, owner notifications
 - `$SKILLS_ROOT/feature-pipeline/pipeline-state.md` — the handoff contract with
   `build-feature`
 - `$SKILLS_ROOT/feature-pipeline/profiles/{backend,frontend,seam}.md` — per-domain slices
@@ -63,8 +63,8 @@ stale — is reconciled in the plan and is not a block.
 ## Phase 2 — Brainstorm + spec
 
 Invoke `brainstorming` (the host's design-exploration skill; see the sub-skill intent map in
-`conventions.md`) to explore design space, requirements, and edge cases,
-informed by the phase-1 findings, then write a spec as an issue comment. Write the spec in
+`conventions.md`) to explore design space, requirements, and edge cases, informed by the phase-1
+findings, then write a spec as an issue comment. Write the spec in
 **Simplified Technical English (ASD-STE100)** — see the writing-style section in `conventions.md`.
 
 - **Small changes:** skip both brainstorming and the written spec once the premise check is
@@ -137,8 +137,7 @@ the plan and record them in `design assets`. Nothing to sync.
 ## Phase 4 — Write the plan
 
 Invoke `writing-plans` (the host's plan-authoring skill), layering the **house plan style** on
-top. Write all plan
-prose in **Simplified Technical English (ASD-STE100)** — see the writing-style section in
+top. Write all plan prose in **Simplified Technical English (ASD-STE100)** — see the writing-style section in
 `conventions.md`. **The plan's required structure is shared** — see
 `$SKILLS_ROOT/feature-pipeline/plan-structure.md` for the Global Constraints preamble,
 `Verified external API`, the checkbox/agentic-worker header, and profile-shaped tasks. Do not

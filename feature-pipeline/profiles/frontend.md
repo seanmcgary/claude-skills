@@ -28,9 +28,13 @@ Backend verification is "tests green." Frontend adds **observe the rendered resu
 2. **Drive and observe.** Use the `verify` skill to exercise the real flow. For visual/interaction capture use the host's browser tool if available (`claude-in-chrome` under Claude; Playwright, or another browser-automation tool under other agents) — otherwise the project's e2e tool (Cypress/Playwright) or a component harness (Storybook). Screenshot at **each breakpoint the plan named** and check the render against the task's acceptance criteria — states present, no overflow, tokens matched.
 3. **Component/interaction tests.** Discover and use the project's test tooling (Vitest/Jest + Testing Library, Playwright, Cypress). Cover the interaction and each non-trivial state.
 4. **Accessibility check.** Tab through the feature: every control reachable, focus visible, order sensible. Run the project's a11y linter/`axe` if present.
-5. **Mechanical gates.** Run format/lint/test/typecheck as the backend profile does.
+5. **Mechanical gates.** Run format/lint/typecheck plus the task's **targeted** tests — the new
+   component/interaction tests and any existing test the change can affect — as the backend
+   profile does. Do not run the full suite here; it runs once at commit review.
 
-A task is done when its screenshots match the acceptance criteria, its component tests pass, the a11y check is clean, and the gates are green. When the environment cannot render the UI at all, that is a blocker to surface — do not mark a visual task done on unit tests alone.
+A task is done when its screenshots match the acceptance criteria, its targeted tests pass, the
+a11y check is clean, and the fast gates are green. When the environment cannot render the UI at
+all, that is a blocker to surface — do not mark a visual task done on unit tests alone.
 
 ## Reviewer slice (stages 2 & 4)
 

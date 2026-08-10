@@ -160,7 +160,7 @@ For findings triaged as "Fix":
 
 ### 6. Pre-push quality gates
 
-**Always run the project's format, lint, and test commands before committing.** Discover them from the project's conventions doc (the first agent-instructions/standards file that exists at the repo root — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `STANDARDS.md`), the `Makefile`, or the package manifest (`package.json` scripts, `Cargo.toml`, `pyproject.toml`, etc.). Typical shapes: `make fmt` / `make lint` / `make test`, `npm run format` / `npm run lint` / `npm test`, `cargo fmt` / `cargo clippy` / `cargo test`.
+**Always run format/lint plus the tests covering the changed code before committing.** Run the full test suite locally only when it is cheap; each push runs the full suite in CI, and that is where cross-task regressions surface in this loop (see "Test cadence" in `conventions.md`). Discover the commands from the project's conventions doc (the first agent-instructions/standards file that exists at the repo root — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `STANDARDS.md`), the `Makefile`, or the package manifest (`package.json` scripts, `Cargo.toml`, `pyproject.toml`, etc.). Typical shapes: `make fmt` / `make lint` / `make test`, `npm run format` / `npm run lint` / `npm test`, `cargo fmt` / `cargo clippy` / `cargo test`.
 
 If a gate fails for reasons **unrelated to your changes** (pre-existing failures on the default branch), note this in your status report and proceed. If a gate fails **because of your changes**, fix the issue before committing.
 
