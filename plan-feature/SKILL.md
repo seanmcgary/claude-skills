@@ -160,13 +160,31 @@ prose in **Simplified Technical English (ASD-STE100)** — see the writing-style
   State); never post a duplicate plan. Materialize a local, UNCOMMITTED working copy for
   executor tooling that needs a plan file, kept in sync with the comment.
 - **Global Constraints preamble:** immediately after the Architecture block, a `## Global
-  Constraints` section restating **verbatim** the binding conventions this feature can touch,
-  copied word-for-word from the repo's conventions doc (the first that exists at the repo root:
-  `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `STANDARDS.md`/`STYLEGUIDE.md`; follow links to
-  detailed standards docs). Copy, do not paraphrase.
+  Constraints` section **citing** the binding conventions this feature can touch — one line per
+  rule: its name, where it is enforced, and a link. Do NOT copy their text.
+
+  The conventions doc (the first that exists at the repo root: `AGENTS.md`, `CLAUDE.md`,
+  `CONTRIBUTING.md`, `STANDARDS.md`/`STYLEGUIDE.md`) is already loaded into every agent session
+  in that repo, executors included, so reproducing it in the plan duplicates something the
+  reader already has — and pays for it again on every execution run. The value of this section
+  is the **selection**: which rules bite for THIS change. That survives at a fraction of the
+  size.
+
+  Two exceptions where you still quote verbatim: a rule you are asking the executor to
+  deliberately depart from, and a rule whose exact wording is itself contested by the change.
+
+  **A constraint that would be identical in the next plan is not plan content.** If it is
+  missing from the conventions doc, say so in the plan and recommend adding it there — do not
+  compensate by pasting it into every plan.
 - **`Verified external API (do not re-derive)`** — a section with that exact title listing exact
   signatures, types, and behaviors of external/library APIs the plan depends on. Pin these by
   reading actual source; never from memory.
+
+  Scope it to facts that are **specific to this issue**. A fact that outlives the issue and will
+  be re-derived by the next plan belongs in the repo as reference material (in this repo,
+  `docs/reference/<topic>.md`, dated and sourced); cite it as `path:line` here instead of
+  restating it. Recording a durable fact once and citing it is the point — re-deriving it per
+  plan is the waste.
 - **`### Design assets`** — the committed paths from phase 3, or an explicit statement that this
   feature has no visual surface.
 - **Checkbox tasks with the agentic-worker header.** Every task uses `- [ ]`. The plan begins
