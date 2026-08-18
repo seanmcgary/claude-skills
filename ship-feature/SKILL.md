@@ -112,13 +112,26 @@ writing-style section in `conventions.md`. All five structural requirements belo
 
 - **File location:** `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`.
 - **Global Constraints preamble:** immediately after the Architecture block, a
-  `## Global Constraints` section restating **verbatim** the binding conventions this feature can
-  touch, copied word-for-word from the repo's conventions doc — the first that exists at the repo
-  root: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `STANDARDS.md`/`STYLEGUIDE.md` (follow any
-  link a primary file makes to a detailed standards doc). Copy; do not paraphrase.
+  `## Global Constraints` section **citing** the binding conventions this feature can touch — one
+  line per rule: its name, where it is enforced, and a link. Do NOT copy their text.
+
+  The conventions doc (the first that exists at the repo root: `AGENTS.md`, `CLAUDE.md`,
+  `CONTRIBUTING.md`, `STANDARDS.md`/`STYLEGUIDE.md`) is already loaded into every agent session in
+  that repo, executors included, so reproducing it in the plan duplicates what the reader already
+  has — and pays for it again on every execution run. The value of this section is the
+  **selection**: which rules bite for THIS change. Two exceptions still quote verbatim: a rule the
+  plan deliberately departs from, and a rule whose exact wording the change contests.
+
+  **A constraint that would be identical in the next plan is not plan content.** If it is missing
+  from the conventions doc, say so and recommend adding it there — do not compensate by pasting it
+  into every plan.
 - **`Verified external API (do not re-derive)`** — a section with that exact title listing exact
   signatures, types, and behaviors of external/library APIs the plan depends on. Pin these by
   reading actual source, never from memory.
+
+  Scope it to facts **specific to this change**. A fact that outlives it and will be re-derived by
+  the next plan belongs in the repo as dated, sourced reference material; cite it as `path:line`
+  here instead of restating it.
 - **Checkbox tasks with agentic-worker header:** every task uses `- [ ]`, and the plan begins
   with:
   > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
