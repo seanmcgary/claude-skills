@@ -74,27 +74,13 @@ digraph pipeline {
 **Skip condition:** if the user provides a path to an approved spec or plan whose
 `## Pipeline State` block shows stage >= 2, skip to the indicated stage (see Resume).
 
-**0. Premise & blast-radius check — do this FIRST, by reading code, not assumption.** A plan
-built on a wrong premise passes every downstream review: three fresh reviewers will all bless a
-correct-looking implementation of the wrong thing, because the error is baked equally into the
-plan and the spec. Review layers cannot catch a shared blind spot; only checking reality up
-front can. Answer each by grepping/reading and record the findings with `file:line` evidence in
-the spec (or, for a Small change that skips the spec, in the plan's Global Constraints preamble):
+**0. Premise & blast-radius check — do this FIRST, by reading code, not assumption.** Run the
+shared check at `~/.claude/skills/feature-pipeline/premise-check.md`: what to answer, the three
+outcomes, and what is NOT a premise failure. Do not restate it here.
 
-- **Entry path** — how is the thing I'm changing actually reached? Who calls this
-  endpoint/function/flag? Is there a proxy, gateway, BFF, or other indirection in front of it?
-- **Blast radius** — what else lives on this path? Enumerate every repo, service, and surface the
-  change touches or that consumes its output. If the answer includes another repo, that repo is
-  IN SCOPE for this run, not a follow-up.
-- **Prior art** — is there an existing config/pattern/host to reuse instead of inventing one?
-- **Contradiction scan** — does anything I just read contradict the user's framing? If the user
-  names a URL, host, or component, verify it against the code NOW, not after the PR is open.
-- **Profile + class** — set the active profile(s) and the Right-Sizing class per
-  `conventions.md`, and record both in Pipeline State with a one-line reason.
-
-If any answer is unknown after a reasonable search, that is itself a finding — surface it, do not
-paper over it with a plausible guess. This step is cheap and is the single highest-leverage
-defense against a full rework.
+Specific to this skill: the human is present, so a contradiction between the user's framing and
+the code is usually resolved by asking in one exchange rather than parking. Outcome 2 there —
+premise holds, details are stale — is reconciled in the plan and is never a stop.
 
 **1. Brainstorm + spec.** Invoke `superpowers:brainstorming` to explore design space,
 requirements, and edge cases, informed by the step-0 findings, then write a spec in **Simplified
@@ -107,28 +93,19 @@ approach is clear but not trivial, confirm the approach in one exchange rather t
 one-question-at-a-time ceremony.
 
 **2. Write the plan.** Invoke `superpowers:writing-plans`, layering the **house plan style** on
-top. Write all plan prose in **Simplified Technical English (ASD-STE100)** — see the
-writing-style section in `conventions.md`. All five structural requirements below MUST be present:
+top, in **Simplified Technical English (ASD-STE100)**. **The plan's required structure is
+shared** — see `~/.claude/skills/feature-pipeline/plan-structure.md` for the Global Constraints
+preamble, `Verified external API`, the checkbox/agentic-worker header, and profile-shaped tasks.
+Do not restate it here.
+
+One requirement is specific to this skill:
 
 - **File location:** `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`.
-- **Global Constraints preamble:** immediately after the Architecture block, a
-  `## Global Constraints` section restating **verbatim** the binding conventions this feature can
-  touch, copied word-for-word from the repo's conventions doc — the first that exists at the repo
-  root: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `STANDARDS.md`/`STYLEGUIDE.md` (follow any
-  link a primary file makes to a detailed standards doc). Copy; do not paraphrase.
-- **`Verified external API (do not re-derive)`** — a section with that exact title listing exact
-  signatures, types, and behaviors of external/library APIs the plan depends on. Pin these by
-  reading actual source, never from memory.
-- **Checkbox tasks with agentic-worker header:** every task uses `- [ ]`, and the plan begins
-  with:
-  > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
-  > (recommended) or superpowers:executing-plans to implement this plan task-by-task.
-- **Profile-shaped tasks** per the active profile's planner slice, each with a `review: yes|no`
-  tag and concrete **acceptance criteria** — the exact checks that prove it done (tests to pass;
-  for UI tasks the breakpoints to render, tokens to match, and keyboard/focus/reduced-motion
-  checks). These criteria are what let a mid-level executor verify its own work and what
-  reviewers grade against. For a full-stack change, fix the API contract first (seam addendum) so
-  both sides build to it.
+
+**This skill has no design-sync phase, and that is deliberate.** It runs interactively with the
+human present in the CLI, so a wrong design surfaces immediately in conversation. `build-feature`
+needs `plan-feature`'s committed design assets because it runs autonomously and nobody sees the UI
+until the PR. Do not import that phase here.
 
 **3. Initialize the Pipeline State block** (see below).
 
