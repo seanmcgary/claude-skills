@@ -48,33 +48,14 @@ what has already been asked and answered; never re-ask a question the thread alr
 
 ## Phase 1 — Premise & blast-radius check
 
-Do this FIRST, by reading code, before brainstorming any design detail. A plan built on a wrong
-premise passes every downstream review: three fresh reviewers will all bless a correct-looking
-implementation of the wrong thing, because the error is baked equally into the plan and the
-spec. Review layers cannot catch a shared blind spot; only checking reality up front can.
+Run the shared check at `~/.claude/skills/feature-pipeline/premise-check.md`. It defines what to
+answer, the three outcomes, and — importantly — what is NOT a premise failure. Do not restate it
+here.
 
-Answer each by grepping/reading, and record findings with `file:line` evidence in the spec (or,
-for a Small change that skips the spec, in the plan's Global Constraints preamble):
-
-- **Entry path** — how is the thing I'm changing actually reached? Who calls this
-  endpoint/function/flag? Is there a proxy, gateway, BFF, or other indirection in front of it?
-- **Blast radius** — what else lives on this path? Enumerate every repo, service, and surface
-  the change touches or that consumes its output. If the answer includes another repo, that repo
-  is IN SCOPE for this run, not a follow-up.
-- **Prior art** — is there an existing config/pattern/host to reuse instead of inventing one?
-- **Contradiction scan** — does anything I just read contradict the issue's framing or my
-  assumption? If the issue names a URL, host, or component, verify it against the code now.
-- **Profile + class** — from the surfaces enumerated, set the active profile(s) and the
-  Right-Sizing class per `conventions.md`. Record both in Pipeline State with a one-line reason.
-
-If any answer is unknown after a reasonable search, that is itself a finding — surface it, do
-not paper over it with a plausible guess.
-
-**Premise failure is a first-class outcome.** If the check concludes the issue as filed should
-not be built — wrong problem, already solved, blast radius far beyond the ask, or it needs
-splitting into several issues — post that finding with your reasoning and a recommendation, and
-STOP. Do **not** close the issue, do **not** silently reshape it into a different feature, and
-do **not** invent scope the issue does not support. The human decides.
+Two notes specific to this skill: record the findings in the spec (or, for a Small change that
+skips the spec, in the plan's Global Constraints preamble), and a genuine premise failure is a
+PARK-BLOCKED, so it costs a parked slot. Outcome 2 in that file — premise holds, details are
+stale — is reconciled in the plan and is not a block.
 
 ## Phase 2 — Brainstorm + spec
 
@@ -153,49 +134,19 @@ the plan and record them in `design assets`. Nothing to sync.
 
 Invoke `superpowers:writing-plans`, layering the **house plan style** on top. Write all plan
 prose in **Simplified Technical English (ASD-STE100)** — see the writing-style section in
-`conventions.md`. The six structural requirements below MUST all be present:
+`conventions.md`. **The plan's required structure is shared** — see
+`~/.claude/skills/feature-pipeline/plan-structure.md` for the Global Constraints preamble,
+`Verified external API`, the checkbox/agentic-worker header, and profile-shaped tasks. Do not
+restate it here.
+
+Two requirements are specific to this skill:
 
 - **Location:** the plan is an **issue comment**, not a repo file. Do not create
   `docs/superpowers/plans/…`. On revision, EDIT that comment in place (track its ID in Pipeline
-  State); never post a duplicate plan. Materialize a local, UNCOMMITTED working copy for
-  executor tooling that needs a plan file, kept in sync with the comment.
-- **Global Constraints preamble:** immediately after the Architecture block, a `## Global
-  Constraints` section **citing** the binding conventions this feature can touch — one line per
-  rule: its name, where it is enforced, and a link. Do NOT copy their text.
-
-  The conventions doc (the first that exists at the repo root: `AGENTS.md`, `CLAUDE.md`,
-  `CONTRIBUTING.md`, `STANDARDS.md`/`STYLEGUIDE.md`) is already loaded into every agent session
-  in that repo, executors included, so reproducing it in the plan duplicates something the
-  reader already has — and pays for it again on every execution run. The value of this section
-  is the **selection**: which rules bite for THIS change. That survives at a fraction of the
-  size.
-
-  Two exceptions where you still quote verbatim: a rule you are asking the executor to
-  deliberately depart from, and a rule whose exact wording is itself contested by the change.
-
-  **A constraint that would be identical in the next plan is not plan content.** If it is
-  missing from the conventions doc, say so in the plan and recommend adding it there — do not
-  compensate by pasting it into every plan.
-- **`Verified external API (do not re-derive)`** — a section with that exact title listing exact
-  signatures, types, and behaviors of external/library APIs the plan depends on. Pin these by
-  reading actual source; never from memory.
-
-  Scope it to facts that are **specific to this issue**. A fact that outlives the issue and will
-  be re-derived by the next plan belongs in the repo as reference material (in this repo,
-  `docs/reference/<topic>.md`, dated and sourced); cite it as `path:line` here instead of
-  restating it. Recording a durable fact once and citing it is the point — re-deriving it per
-  plan is the waste.
+  State); never post a duplicate plan. Materialize a local, UNCOMMITTED working copy for executor
+  tooling that needs a plan file, kept in sync with the comment.
 - **`### Design assets`** — the committed paths from phase 3, or an explicit statement that this
   feature has no visual surface.
-- **Checkbox tasks with the agentic-worker header.** Every task uses `- [ ]`. The plan begins
-  with:
-  > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
-  > (recommended) or superpowers:executing-plans to implement this plan task-by-task.
-- **Profile-shaped tasks** per the active profile's planner slice, each with a `review: yes|no`
-  tag and concrete **acceptance criteria** — the exact checks that prove it done. For UI tasks
-  that means the breakpoints to render, the tokens to match, and the keyboard/focus/
-  reduced-motion checks. These criteria are what let a mid-level executor verify its own work.
-  For a full-stack change, fix the API contract first (seam addendum) so both sides build to it.
 
 Then initialize or update the `## Pipeline State` block per `pipeline-state.md`.
 
