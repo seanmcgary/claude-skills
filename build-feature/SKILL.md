@@ -96,7 +96,8 @@ breakpoint the plan named, check against the task's acceptance criteria, and tab
 keyboard reachability and visible focus. A visual task is never done on unit tests alone; if the
 environment cannot render the UI at all, that is a blocker to surface.
 
-Update Pipeline State on completion.
+Update Pipeline State on completion — including any `### Decisions` entries for plan deviations
+made during the tasks.
 
 ## Phase 3 — Commit review
 
@@ -114,7 +115,8 @@ without a PR review bot). If the repo has none, "the bot will catch it" is not a
 reason to review less: run the fan-out, or at absolute minimum gates + a genuine self-review.
 Never leave a diff with no review at all.
 
-Update Pipeline State on completion.
+Update Pipeline State on completion. A triaged finding whose fix departs from the approved plan
+is a `### Decisions` entry, not a park — this phase is where most of them are made.
 
 ## Phase 4 — PR + feedback loop
 
@@ -127,7 +129,13 @@ Update Pipeline State on completion.
 - **If `pr` is `n/a`:** push and open it now — `gh pr create --assignee seanmcgary` with the full
   description, linking the issue via `Closes #<issue>`.
 
-Either way: assign `@seanmcgary`, @-mention him in the ready-for-review comment, then flip the
+Either way: if the `### Decisions` list has entries, the PR body carries a **"Deviations from
+the approved plan"** section built from it — one bullet per entry, each naming what the plan
+said, what you did, and why. This is the whole payoff of deciding rather than asking: the human
+sees every judgment call in one place, next to the diff that implements it. A run with
+deviations and no such section has hidden them.
+
+Then: assign `@seanmcgary`, @-mention him in the ready-for-review comment, and flip the
 issue's labels — remove `status:ready-for-execution`, add `status:ready-for-review`.
 
 **Run the feedback loop** (`pr-feedback-loop`, N=3 default). Triage findings, apply fixes, reply
@@ -148,12 +156,39 @@ open the PR, or address a finding — triage and proceed. Stop only for a blocke
 resolve on your own:
 
 1. **An implementation blocker you cannot fix** — the plan is wrong or impossible, or a task
-   cannot be completed as specified.
+   cannot be completed as specified. "The plan did not anticipate this" is not that; see
+   *Deviating from the plan* below.
 2. **An ambiguous or contentious human comment** on the PR or the issue.
-3. **A required architecture deviation** from the approved plan — structural, not a minor fix.
-4. **The round cap reached** with actionable findings still open.
-5. **A missing or uncited design artifact** — the plan requires matching a design and the file
+3. **The round cap reached** with actionable findings still open.
+4. **A missing or uncited design artifact** — the plan requires matching a design and the file
    isn't there (see phase 1).
+
+### Deviating from the plan — decide, log, surface
+
+**A deviation from the approved plan is NOT a blocker. Decide it yourself.** Approving the plan
+authorized the outcome, not a literal transcript: no plan specifies everything, so a review
+finding whose fix the plan does not describe is the normal case, not an exception. Adding
+middleware the plan omitted, changing a bootstrap order, introducing a request-invalidation
+scheme to close a defect review found — all of these you resolve on your own, however structural
+they are.
+
+For each one, **log it and keep going**:
+
+1. Append an entry to the `### Decisions` list under Pipeline State — the task, what the plan
+   said, what you did instead, and why (see `pipeline-state.md`). Write it when you make the
+   decision, not from memory at the end.
+2. Bump the `decisions` count in the Pipeline State table.
+3. At phase 4, render the whole list as a **"Deviations from the approved plan"** section in the
+   PR body.
+
+The human reviews these **at the PR**, with the diff in front of them — which is a better review
+than the same question answered blind in an issue comment, and it does not cost a full dispatch
+of latency. Surface the decision; do not ask for it.
+
+The one thing a deviation may never do is quietly widen scope. If your fix takes the feature
+somewhere the issue did not ask to go, log that plainly in the same entry and say so in the PR
+body — an unflagged scope change is what this rule is protecting against, not the deviation
+itself.
 
 When you hit one: commit and **push** your work first, then post the blocker as an issue comment
 @-mentioning `@seanmcgary`, set `status:needs-execution-input` (removing
@@ -177,3 +212,10 @@ resolves it and re-applies `status:ready-for-execution`.
    wait forever.
 6. **"PR is open, my job is done."** Opening the PR starts the feedback loop; it does not end
    the run.
+7. **"The plan doesn't cover this, so I should park and ask."** Almost always wrong. Parking
+   costs a full human round-trip to answer a question the reviewer could have answered from the
+   diff. Decide it, log it under `### Decisions`, surface it in the PR body. Park only for the
+   four blockers above.
+8. **"I made the call, so it doesn't need writing down."** An undocumented deviation is worse
+   than parking: the human never learns the plan was departed from, and reviews the diff
+   believing it matches what they approved.

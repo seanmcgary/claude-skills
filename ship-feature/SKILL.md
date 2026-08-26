@@ -184,7 +184,10 @@ stage-5 rounds. It stays a draft until stage 5.
    mark it ready (`gh pr ready <n>`), assign
    `@seanmcgary` (`gh pr edit <n> --add-assignee seanmcgary`), and @-mention him in the
    ready-for-review note. Fall back to `gh pr create` only if no PR exists (a no-remote run that
-   skipped the stage-1 draft).
+   skipped the stage-1 draft). If the `### Decisions` list has entries, the body carries a
+   **"Deviations from the approved plan"** section built from it — one bullet each, naming what
+   the plan said, what you did, and why. A run with deviations and no such section has hidden
+   them.
 2. Invoke `pr-feedback-loop` with N=3. It waits for review, triages findings, applies fixes,
    replies to threads, and repeats for up to N rounds. (It sees the PR already open and skips its
    own create-PR setup; the `docs:` spec/plan commits do not match its round-counter grep, so
@@ -214,6 +217,7 @@ After each stage transition, update a `## Pipeline State` block in the plan docu
 | pr      | #<n>                                      |
 | gate    | approved 2026-07-29                       |
 | round   | 0                                         |
+| decisions | 2 (see Decisions below)                 |
 ```
 
 - **`stage`** — current stage number and name.
@@ -225,6 +229,10 @@ After each stage transition, update a `## Pipeline State` block in the plan docu
 - **`gate`** — `pending`, or `approved <date>` once the human approves at stage 2. A respawn must
   never infer approval from the stage number alone.
 - **`round`** — current feedback round within stage 5 (`0` before stage 5).
+- **`decisions`** — how many entries the `### Decisions` list below the table holds (`0` when
+  there are none). Every deviation from the approved plan is logged there rather than escalated
+  — see the Autonomy Contract — and the list must be complete before the PR is readied, because
+  it is what stage 5's "Deviations from the approved plan" section is written from.
 
 **Resume:** on invocation, if the plan doc already has a Pipeline State block, read it and resume
 from the indicated stage rather than starting over. Never resume into stage 3+ unless `gate`
@@ -232,17 +240,30 @@ shows approved.
 
 ## Autonomy Contract
 
-After the gate, proceed **without asking permission** except in exactly three cases:
+After the gate, proceed **without asking permission** except in exactly two cases:
 
 1. **Ambiguous or contentious review comment** — unclear in intent, contradicts project
    conventions, or requires a judgment call that could go either way. STOP and surface it.
-2. **Architecture deviation required** — a finding or blocker requires deviating from the
-   approved plan's architecture (structural, not a minor fix). STOP and present it for approval.
-3. **Round cap hit with actionable findings still open.** STOP and report the remaining items.
+2. **Round cap hit with actionable findings still open.** STOP and report the remaining items.
 
 Everything else proceeds autonomously. Do NOT ask "should I continue?" Do NOT ask permission to
 run tests, push, or open a PR. Do NOT ask whether to address a finding — triage it per
 `pr-feedback-loop`'s criteria.
+
+### Deviating from the plan — decide, log, surface
+
+**A deviation from the approved plan is NOT a reason to stop.** The gate approved the outcome,
+not a literal transcript: no plan specifies everything, so a finding whose fix the plan does not
+describe is the normal case. Decide it yourself, however structural it is.
+
+For each one, append an entry to a `### Decisions` list under Pipeline State — the task, what
+the plan said, what you did instead, and why — bump the `decisions` count, and render the whole
+list as a **"Deviations from the approved plan"** section in the PR body at stage 5. The human
+reviews these at the PR, with the diff in front of them, which is a better review than the same
+question answered blind mid-run.
+
+The one thing a deviation may never do is quietly widen scope. If the fix takes the feature
+somewhere the request did not ask to go, say so plainly in the entry and in the PR body.
 
 **The pipeline NEVER merges.** It ends with a status report. Merging is a human decision.
 
@@ -255,8 +276,9 @@ run tests, push, or open a PR. Do NOT ask whether to address a finding — triag
 2. **"This is a small change, so I can skip the premise check."** Backwards. The premise check is
    MOST valuable on changes that look small: a small-looking change built on a wrong assumption
    produces a fast, confident, completely wrong PR that every review layer then blesses.
-3. **"I'll just ask the user to be safe."** After the gate you proceed autonomously. The three
-   exceptions are the only reasons to stop.
+3. **"I'll just ask the user to be safe."** After the gate you proceed autonomously. The two
+   exceptions are the only reasons to stop. "The plan doesn't cover this" is not one of them —
+   decide it, log it under `### Decisions`, surface it in the PR body.
 4. **"I can skip brainstorming and the spec for a small feature."** Acceptable for a Small change
    once the premise check is clean, or if a spec already exists. But the premise check is never
    optional, the plan is never skipped, and the gate never goes away.

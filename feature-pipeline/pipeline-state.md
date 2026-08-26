@@ -22,6 +22,18 @@ This file is the single definition of that block. Both skills reference it; neit
 | pr            | #76 (draft)                                      |
 | design assets | docs/design/hardinessZone.dc.html                |
 | round         | 0                                                |
+| decisions     | 2 (see Decisions below)                          |
+```
+
+When `decisions` is non-zero, a `### Decisions` list follows the table in the same comment:
+
+```markdown
+### Decisions
+
+- **Task 3 — checkout request invalidation.** Plan: `clearCurrentCheckout()` clears state and
+  nothing else. Did: added a request-generation counter that invalidates in-flight checkout
+  requests. Why: an earlier `createCheckout` could settle after the clear and restore
+  `paymentClientSecret`, leaking a payment credential across sessions.
 ```
 
 ## Fields
@@ -50,6 +62,13 @@ This file is the single definition of that block. Both skills reference it; neit
   match" from "someone forgot to sync the design." An empty or missing value is neither, and
   `build-feature` treats it as a blocker on any feature with UI.
 - **`round`** — current feedback round within stage 5 (`0` before stage 5).
+- **`decisions`** — how many entries the `### Decisions` list holds (`0` when there are none).
+  Every deviation `build-feature` makes from the approved plan is logged there rather than
+  parked — see build-feature's Autonomy contract. Each entry names the task, what the plan
+  said, what was done instead, and why, in that order. The list is the source the PR body's
+  "Deviations from the approved plan" section is written from, so it must be complete before
+  the PR is readied: the human reviews these decisions at the PR, not at the moment they are
+  made.
 
 ## Resume
 
