@@ -7,8 +7,8 @@ description: Use when taking a frontend/UI feature from idea or spec all the way
 
 This is **`ship-feature` with the `frontend` profile pinned.** It is not a separate pipeline.
 Follow `ship-feature` exactly — its five stages, the single human gate, the autonomy contract,
-and everything it inherits from `~/.claude/skills/feature-pipeline/conventions.md` (right-sizing,
-model tiering, review cadence) apply unchanged.
+and everything it inherits from `$SKILLS_ROOT/feature-pipeline/conventions.md` (right-sizing,
+model tiering, test cadence, review cadence) apply unchanged.
 
 The only difference: the active profile is **`frontend`**, not the default `backend`. Skip
 `ship-feature`'s profile-inference step — the profile is pinned by this entry point.
@@ -22,7 +22,7 @@ and additionally sync the design source into the repo before the gate.
 1. Invoke `ship-feature` and run its pipeline as written.
 2. Set the Pipeline State `profile` field to `frontend`.
 3. At the start of stages 1, 3, and 4, read
-   `~/.claude/skills/feature-pipeline/profiles/frontend.md` and apply its matching slice (planner
+   `$SKILLS_ROOT/feature-pipeline/profiles/frontend.md` and apply its matching slice (planner
    guidance / executor verification pack / reviewer rubric).
 
 Do **not** re-specify the models, gate, cadence, or stage sequence here — they come from

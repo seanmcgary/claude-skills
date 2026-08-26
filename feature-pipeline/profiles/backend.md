@@ -20,7 +20,13 @@ A profile supplies three slices, each consumed by a different phase. **`plan-fea
 
 ## Executor slice (stage 3)
 
-Verification is **tests + mechanical gates green**. Follow TDD: write the covering test, make it pass, then the project's format/lint/test gates. A task is done when its named tests pass and the gates are clean — no browser, no screenshots. This is the baseline the mid-level executor already knows how to reach; the frontend profile is where verification diverges.
+Verification is **targeted tests + fast gates green**. Follow TDD: write the covering test,
+make it pass, then run **that task's tests only** — the new test(s) plus any existing test the
+change can affect — followed by the fast mechanical gates (format, lint, typecheck). Do **not**
+run the full test suite per task; the full suite runs once at commit review (see the "Test
+cadence" section in `conventions.md`). A task is done when its named tests pass and the fast
+gates are clean — no browser, no screenshots. This is the baseline the mid-level executor
+already knows how to reach; the frontend profile is where verification diverges.
 
 ## Reviewer slice (stages 2 & 4)
 

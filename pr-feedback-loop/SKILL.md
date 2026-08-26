@@ -27,7 +27,7 @@ Pushing back is legitimate and expected. A reviewer flagging dead code that has 
 ### If no PR exists yet
 
 1. Push the branch: `git push -u origin <branch>`
-2. Open the PR using the body format from `~/.claude/commands/generate-pr-description.md`:
+2. Open the PR using the body format from the host's PR-description generator (`$SKILLS_ROOT/../commands/generate-pr-description.md` under Claude Code):
    ```bash
    gh pr create --title "<type>: <summary>" --body "$(cat <<'EOF'
    # tl;dr
@@ -58,7 +58,21 @@ If CI is failing for reasons related to this PR's changes, treat each failure as
 
 ### 2. Wait for the bot review
 
-The Claude GitHub Action posts a **sticky comment** (updates in place). While in progress it shows checkboxes; when done it starts with `**Claude finished`. The comment may temporarily show progress markers — only act on it once the `**Claude finished` prefix appears.
+**Detect the reviewer first — it varies by repo and host.** This skill is written so you follow
+whichever reviewer the repo actually uses:
+
+- **Claude GitHub Action** (Claude Code's PR review bot): posts a **sticky comment** that updates
+  in place. While in progress it shows checkboxes; when done it starts with `**Claude finished`.
+  This is the path documented in detail below.
+- **Another bot / app** (an agent-agnostic GH app, native GitLab/GitHub bot): reports via its own
+  comment or review threads and refreshes on push. Detect it by its author/login, and poll for a
+  *new, fresh* review after each push rather than matching a specific text prefix.
+- **No bot at all:** do NOT wait — proceed on CI status and human comments only, per
+  `conventions.md` ("repositories without a PR review bot").
+
+**Claude GitHub Action path:** the bot posts a **sticky comment** that updates in place. While in
+progress it shows checkboxes; when done it starts with `**Claude finished`. The comment may
+temporarily show progress markers — only act on it once the `**Claude finished` prefix appears.
 
 **For round k > 1:** A push triggers a new review that overwrites the sticky comment. The previous `**Claude finished` text disappears during the new run. Poll until the prefix reappears — and verify the job URL is different from the previous round's (the link includes the run ID).
 
@@ -103,7 +117,9 @@ Only treat the comment as fresh if `updated_at` is later than your push time. If
 
 Gather ALL feedback sources:
 
-**A. Bot sticky comment** — parse the top-level PR comment starting with `**Claude finished` for findings. Look for severity markers, code blocks, and fix suggestions.
+**A. Bot review** — parse the reviewer's output for findings. For the Claude GitHub Action,
+parse the top-level PR comment starting with `**Claude finished`; for other bots, read their own
+comment/thread. Look for severity markers, code blocks, and fix suggestions.
 
 ```bash
 gh pr view <n> --repo <owner>/<repo> --json comments \
@@ -144,7 +160,7 @@ For findings triaged as "Fix":
 
 ### 6. Pre-push quality gates
 
-**Always run the project's format, lint, and test commands before committing.** Discover them from the project's conventions doc (the first agent-instructions/standards file that exists at the repo root — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `STANDARDS.md`), the `Makefile`, or the package manifest (`package.json` scripts, `Cargo.toml`, `pyproject.toml`, etc.). Typical shapes: `make fmt` / `make lint` / `make test`, `npm run format` / `npm run lint` / `npm test`, `cargo fmt` / `cargo clippy` / `cargo test`.
+**Always run format/lint plus the tests covering the changed code before committing.** Run the full test suite locally only when it is cheap; each push runs the full suite in CI, and that is where cross-task regressions surface in this loop (see "Test cadence" in `conventions.md`). Discover the commands from the project's conventions doc (the first agent-instructions/standards file that exists at the repo root — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `STANDARDS.md`), the `Makefile`, or the package manifest (`package.json` scripts, `Cargo.toml`, `pyproject.toml`, etc.). Typical shapes: `make fmt` / `make lint` / `make test`, `npm run format` / `npm run lint` / `npm test`, `cargo fmt` / `cargo clippy` / `cargo test`.
 
 If a gate fails for reasons **unrelated to your changes** (pre-existing failures on the default branch), note this in your status report and proceed. If a gate fails **because of your changes**, fix the issue before committing.
 

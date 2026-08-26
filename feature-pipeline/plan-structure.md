@@ -47,8 +47,8 @@ here instead of restating it.
 
 Every task uses `- [ ]`. The plan begins with:
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
-> (recommended) or superpowers:executing-plans to implement this plan task-by-task.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use subagent-driven-development
+> (recommended) or executing-plans to implement this plan task-by-task.
 
 ## Profile-shaped tasks
 
