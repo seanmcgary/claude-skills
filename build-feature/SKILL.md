@@ -50,8 +50,17 @@ git fetch origin
   creates the branch during planning and commits design assets onto it. Re-creating it from the
   default branch silently discards them, and the build then has no design to match.
 - **Only if it genuinely does not exist on origin**, create it from the default branch.
-- Then rebase onto the default branch before new work. **If the rebase conflicts, STOP** and
-  report the conflicted files — never force, never guess a resolution.
+- Then rebase onto the default branch before new work. A conflict is ordinary work, not a
+  blocker: **resolve it yourself when all three hold**, and STOP only when one does not.
+  1. You can state what each side changes and why, citing the commit that introduced it.
+  2. The two sides are independent — they touch different behavior, and keeping both is
+     coherent (e.g. each adds a distinct call to the same function).
+  3. After resolving, the tests both sides have over the conflicted files pass.
+
+  Record the resolution and its reasoning in the PR. **STOP and report the conflicted files**
+  when the two sides disagree about the *same* behavior, when you cannot tell what one side
+  was for, or when you cannot get both sides' tests green — that is a decision for the human.
+  Never force-push over a conflict, and never drop one side to make a conflict go away.
 
 **Resolve the PR:** if `pr` names a draft, that PR is yours to finish — push to its branch and
 promote it at stage 5. Do **not** open a second PR for the same branch. If `pr` is `n/a`, you
