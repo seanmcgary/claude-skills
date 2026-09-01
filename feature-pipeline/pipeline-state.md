@@ -20,6 +20,7 @@ This file is the single definition of that block. Both skills reference it; neit
 | issue         | #69                                              |
 | branch        | feat/hardiness-zone-tool                         |
 | pr            | #76 (draft)                                      |
+| findings comment | 5495839830                                    |
 | design assets | docs/design/hardinessZone.dc.html                |
 | round         | 0                                                |
 | decisions     | 2 (see Decisions below)                          |
@@ -56,6 +57,14 @@ When `decisions` is non-zero, a `### Decisions` list follows the table in the sa
   assets — `build-feature` PROMOTES that PR (`gh pr ready`) rather than opening a second one.
   `n/a` when no design assets were synced, in which case `build-feature` opens the PR itself at
   stage 5.
+- **`findings comment`** — the numeric ID of the review's **findings comment** (see
+  [`review-findings.md`](review-findings.md)), or `n/a` before a review has run. Written by
+  `producing-review-findings`; read by `executing-review-findings`, which fetches exactly that one
+  comment via `gh api repos/{owner}/{repo}/issues/comments/<id>`. **The ID is the field's whole
+  purpose.** A pull request under review carries bot reviews, human comments, and earlier rounds,
+  so an executor that lists and searches instead of fetching by ID will eventually fix the wrong
+  round — silently, because every round looks alike. When a round overflows the comment size cap
+  and is split into parts, this names the **manifest**, never a part.
 - **`design assets`** — newline- or comma-separated repo paths of every design source committed
   for this feature, or the literal `none`. **`none` is a positive assertion by the planner that
   this feature has no visual surface** — it is what lets `build-feature` distinguish "nothing to

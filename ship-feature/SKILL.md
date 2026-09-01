@@ -162,10 +162,11 @@ stage-5 rounds. It stays a draft until stage 5.
 ### Stage 4: Commit Review
 
 1. This is the **one authoritative whole-diff fan-out**:
-   - **Standard/Large:** invoke `reviewing-commits` on the feature branch — mechanical gates
-     (format, lint, then the **full** test suite — the run's one full-suite pass; per-task
-     runs were targeted), then three parallel **profile-aware** reviewers over the branch diff
-     at the `senior` tier; triage, fix as commits, re-run gates. Re-reviews are scope-bounded.
+   - **Standard/Large:** invoke `reviewing-commits` on the feature branch — format and lint,
+     then three parallel **profile-aware** reviewers over the branch diff at the `senior`
+     tier; triage into a findings artifact, then one fresh subagent per file group applying
+     it, with the **full** test suite once at the end (the run's one full-suite pass; per-task
+     runs were targeted). Fold the fixes in as commits. Re-reviews are scope-bounded.
      Stage 3 skipped SDD's final review precisely so this is the single fan-out — do not look for
      a prior
      whole-branch review to dedupe against.

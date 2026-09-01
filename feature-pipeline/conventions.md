@@ -4,7 +4,8 @@ Shared reference for `plan-feature` and `build-feature`. This file defines **how
 skills scale their work and address the owner. It contains no stages and orchestrates nothing —
 each skill runs its own phases end to end and loads this for the rules below.
 
-Companion files: [`pipeline-state.md`](pipeline-state.md) (the handoff contract),
+Companion files: [`pipeline-state.md`](pipeline-state.md) (the plan/build handoff contract),
+[`review-findings.md`](review-findings.md) (the review/remediation handoff contract),
 [`profiles/`](profiles/) (per-domain slices), and [`tiers.md`](tiers.md) (the model resolver).
 
 ## Portability across agents
@@ -24,7 +25,9 @@ agent-specific paths or tool names.
   | `subagent-driven-development` | execute a plan across fresh per-task subagents | Claude: `superpowers:subagent-driven-development`; Pi: `pi-subagents` parallel dispatch |
   | `executing-plans` | execute a plan inline in the current session | Claude: `superpowers:executing-plans`; Pi: native plan execution |
   | `reviewing-plans` | fresh-context reviewer fan-out over a plan | Claude: `superpowers:reviewing-plans`; Pi: `pi-subagents` reviewer fan-out |
-  | `reviewing-commits` | fresh-context reviewer fan-out over a diff | Claude: `superpowers:reviewing-commits`; Pi: `pi-subagents` reviewer fan-out |
+  | `reviewing-commits` | fresh-context reviewer fan-out over a diff, then its fixes, in one session | Claude: `superpowers:reviewing-commits`; Pi: `pi-subagents` reviewer fan-out |
+  | `producing-review-findings` | the fan-out alone, ending at the findings artifact | Claude: `producing-review-findings`; Pi: `pi-subagents` reviewer fan-out with no fix phase |
+  | `executing-review-findings` | apply a findings artifact, one fresh subagent per file group | Claude: `executing-review-findings`; Pi: `pi-subagents` parallel dispatch over the groups |
   | `brainstorming` / `writing-plans` | design exploration / plan authoring | Claude: `superpowers:brainstorming` / `superpowers:writing-plans`; Pi: native equivalents |
 
   Where a skill below spells out `superpowers:<name>`, read it as "invoke the host's
@@ -95,7 +98,13 @@ other agent.
 | Planning — premise check, brainstorm, design sync, plan authoring (`plan-feature`; `ship-feature` stage 1) | senior | **high** |
 | Reviewer subagents — plan review and commit review | senior | high |
 | Per-task implementation (`build-feature`; `ship-feature` stage 3) | mid | default |
+| Per-group remediation subagents (`executing-review-findings`) | mid | default |
 | Orchestration + review triage | senior | high |
+
+Remediation sits at `mid` for the same reason implementation does, and the reason is the artifact:
+a finding whose prescribed fix names the symbol, the line, and the change is a well-specified task,
+and a well-specified task does not need a senior executor. This is also why the reviewer stays
+`senior` — the specification the mid tier consumes is written there.
 
 **`plan-feature` runs entirely at the `senior` tier — the orchestrating session and every
 subagent it dispatches.** Planning is the highest-leverage step in the pipeline: a
@@ -152,6 +161,16 @@ catches anything per task that a targeted run misses. Test in two weights:
 Targeted now, full later: per-task runs give fast signal while the task is fresh; the full suite
 at the end catches cross-task interaction exactly once, in the phase that already owns
 whole-branch verification.
+
+**When review and remediation are split across dispatches** (`producing-review-findings` then
+`executing-review-findings` — the unattended-loop shape), the same two weights apply, one rung
+down. The review's gates run the suite as a **precondition**: there is no point reviewing a red
+branch. Remediation then runs each fix-group's **targeted** tests inside that group's subagent —
+the group's file list is its blast radius, and its `Tests:` command must cover that and nothing
+wider — and the orchestrator runs the **full suite once** after every group returns, fixing what
+that run surfaces itself. A cross-group failure belongs to no single group, so there is no group
+to send it back to. Composed in one session, `reviewing-commits` collapses the precondition run
+and the final run into the single one at the end.
 
 ## Repositories without a PR review bot
 
