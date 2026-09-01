@@ -103,10 +103,11 @@ made during the tasks.
 
 This is the **one authoritative whole-diff fan-out**.
 
-- **Standard/Large:** invoke `reviewing-commits` on the feature branch — mechanical gates
-  (format, lint, then the **full** test suite — the run's one full-suite pass; per-task runs
-  were targeted), and typecheck, then three parallel **profile-aware** reviewers over the
-  branch diff at the `senior` tier. Triage, fix as commits, re-run gates. Re-reviews are
+- **Standard/Large:** invoke `reviewing-commits` on the feature branch — format, lint and
+  typecheck, then three parallel **profile-aware** reviewers over the branch diff at the
+  `senior` tier, triage into a findings artifact, then one fresh subagent per file group
+  applying it. The **full** test suite runs once at the end of that (the run's one full-suite
+  pass; per-task runs were targeted). Fold the fixes in as commits. Re-reviews are
   scope-bounded to each fix, never a fresh whole-diff pass.
 - **Small:** mechanical gates plus a real self-review against the profile's reviewer rubric.
 
