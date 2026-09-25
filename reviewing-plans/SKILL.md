@@ -27,7 +27,7 @@ If no conventions doc exists, note that in the findings table and review against
 3. **Triage each finding** — for each finding, decide:
    - **Fix:** edit the plan inline to resolve the defect. State what was changed.
    - **Reject:** the finding is incorrect or not applicable. State why in one line.
-   - **Defer:** the finding is valid but out of scope for this plan; record it in the findings table with a pointer to where it should be handled (follow-up plan, backlog, or a TODO task added to the plan).
+   - **Defer:** ONLY a major refactor, as "Implement, don't defer" in `$SKILLS_ROOT/feature-pipeline/conventions.md` defines it. File a GitHub issue with `gh issue create` and record its number in the findings table. A valid finding that is not a major refactor is Fix: add the task to the plan. Never defer to a `TODO` task or an unfiled "follow-up".
 
 4. **Re-check interfaces after fixes** — if any fix changed a task's Interfaces (Produces/Consumes) section, re-dispatch ONLY the quality reviewer on the updated plan to verify the fix didn't create new interface mismatches.
 

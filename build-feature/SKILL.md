@@ -91,6 +91,20 @@ slice** to verify each one:
   the `mid` tier (batch only trivial tasks).
 - **Small:** execute inline with `executing-plans`.
 
+**Every implementer dispatch carries this override**, because the host's implementer prompt tells
+the subagent to ask, to stop on anything the plan did not anticipate, and to leave code outside the
+task alone. Append it verbatim to each implementer's prompt:
+
+> You run headless, and no one will answer a question. The plan describes the outcome, not a
+> boundary. When the plan did not anticipate something, decide it, do it, and list it under
+> "Decisions" in your report with what the plan said, what you did, and why. Leave every file you
+> touch better than you found it: fix real defects you see there, pre-existing or not, and cover
+> them with tests. Do not write `TODO` comments, and do not report work as deferred. Return
+> BLOCKED only for build-feature's blockers: the plan is impossible, or a design file is missing.
+
+Copy each reported decision into the `### Decisions` list. A task reviewer's Minor findings are
+fixed in the same fix round as the task's other findings. They are not recorded as deferred.
+
 Apply the **Review Cadence** from `conventions.md`: dispatch a per-task reviewer ONLY for tasks
 the plan tagged `review: yes` (at the `senior` tier); `review: no` tasks are gated by their own
 acceptance criteria. Do **not** run subagent-driven-development's separate final whole-branch
@@ -125,6 +139,11 @@ without a PR review bot). If the repo has none, "the bot will catch it" is not a
 reason to review less: run the fan-out, or at absolute minimum gates + a genuine self-review.
 Never leave a diff with no review at all.
 
+The triage applies "Implement, don't defer" from `conventions.md`: a real finding is Fix, whether it
+is pre-existing, outside the diff, or absent from the plan, and only a major refactor is deferred,
+as a filed GitHub issue. If phase 2 recorded any concern or Minor finding it did not fix, give that
+list to the triage as findings.
+
 Update Pipeline State on completion. A triaged finding whose fix departs from the approved plan
 is a `### Decisions` entry, not a park — this phase is where most of them are made.
 
@@ -144,6 +163,18 @@ the approved plan"** section built from it — one bullet per entry, each naming
 said, what you did, and why. This is the whole payoff of deciding rather than asking: the human
 sees every judgment call in one place, next to the diff that implements it. A run with
 deviations and no such section has hidden them.
+
+The PR body carries three more sections when they have entries, and no others for unfinished work:
+
+- **"Decisions needed"** — only questions an agent does not own alone (a public price, new
+  recurring cost, a legal or compliance surface), each with your recommendation.
+- **"Pre-merge checks"** — checks that cannot run headless (a device, a simulator, VoiceOver).
+- **"Deferred refactors"** — one bullet per major refactor, each linking the GitHub issue you
+  filed for it.
+
+There is no "Deferred", "Follow-ups", "Known gaps", or "Out of scope" section for anything else.
+A gap the feature advertises or depends on (the UI says "kept for 30 days" and no job purges) is
+unfinished work: finish it before you ready the PR.
 
 Then: assign `@seanmcgary`, @-mention him in the ready-for-review comment, and flip the
 issue's labels — remove `status:ready-for-execution`, add `status:ready-for-review`.
@@ -195,10 +226,12 @@ The human reviews these **at the PR**, with the diff in front of them — which 
 than the same question answered blind in an issue comment, and it does not cost a full dispatch
 of latency. Surface the decision; do not ask for it.
 
-The one thing a deviation may never do is quietly widen scope. If your fix takes the feature
-somewhere the issue did not ask to go, log that plainly in the same entry and say so in the PR
-body — an unflagged scope change is what this rule is protecting against, not the deviation
-itself.
+The plan describes the outcome, not a boundary. Widening the work to leave the code better is
+expected: fix the pre-existing defect on the feature's path, the shared primitive the feature
+exposes, the backend half of a bug whose frontend half you fixed. What a deviation may never do
+is go UNLOGGED. Log every one in the same entry format and it reaches the PR body. Nothing is
+deferred except a major refactor, filed as a GitHub issue — see "Implement, don't defer" in
+`conventions.md`.
 
 When you hit one: commit and **push** your work first, then post the blocker as an issue comment
 @-mentioning `@seanmcgary`, set `status:needs-execution-input` (removing
@@ -226,6 +259,9 @@ resolves it and re-applies `status:ready-for-execution`.
    costs a full human round-trip to answer a question the reviewer could have answered from the
    diff. Decide it, log it under `### Decisions`, surface it in the PR body. Park only for the
    four blockers above.
-8. **"I made the call, so it doesn't need writing down."** An undocumented deviation is worse
+8. **"It's pre-existing / out of scope / a follow-up."** None of these is a reason to leave a real
+   defect. Fix it and log it. Only a major refactor is deferred, and only as a filed GitHub issue,
+   never a `TODO` comment or a "Known gaps" bullet.
+9. **"I made the call, so it doesn't need writing down."** An undocumented deviation is worse
    than parking: the human never learns the plan was departed from, and reviews the diff
    believing it matches what they approved.

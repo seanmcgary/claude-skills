@@ -11,7 +11,9 @@ This skill implements a disciplined multi-round feedback loop for addressing PR 
 
 - **Fix** — the reviewer is right; implement the fix.
 - **Push back** — the finding is incorrect or the current code is defensible-as-is. Reply with specific technical reasoning.
-- **Defer** — valid concern but out of scope for this PR. Reply with a TODO or follow-up reference.
+- **Defer** — ONLY a major refactor, as "Implement, don't defer" in `$SKILLS_ROOT/feature-pipeline/conventions.md` defines it. File a GitHub issue and reply with its link. Never a `TODO` comment.
+
+A valid finding is Fix by default. "Pre-existing," "out of scope for this PR," "not in the plan," and "needs a migration" are not reasons to defer: the pipeline leaves code better than it found it.
 
 Pushing back is legitimate and expected. A reviewer flagging dead code that has an intentional rationale, or requesting an export that would break encapsulation, deserves a reasoned disagreement — not blind compliance.
 
@@ -142,8 +144,8 @@ For EACH finding, decide:
 | Decision | Criteria | Action |
 |---|---|---|
 | **Fix** | Reviewer is correct; code has a real bug, security issue, or convention violation with no legitimate counter-argument | Implement the fix |
-| **Push back** | Current code is defensible. There is a specific technical reason (documented in comments, architecture decision, scope constraint) why the code is correct as-is | Reply with reasoning; do NOT change the code |
-| **Defer** | Valid concern but out of scope (large refactor, unrelated to PR's purpose, would require design discussion) | Reply acknowledging validity + TODO/issue reference |
+| **Push back** | Current code is defensible. There is a specific technical reason (documented in comments, architecture decision) why the code is correct as-is. "Out of scope" is not a technical reason | Reply with reasoning; do NOT change the code |
+| **Defer** | ONLY a major refactor: it restructures a subsystem or module boundary across many consumers, and this PR is correct and safe without it. Never security, data integrity, or anything this PR advertises or depends on | `gh issue create` with the finding, the evidence, and the recommended approach; reply with the issue link. No `TODO` comment |
 
 **Bot findings:** Triage autonomously using the criteria above. The bot is often right about security and conventions, but may over-flag dead code or suggest exports that break encapsulation.
 
@@ -184,7 +186,7 @@ For EACH finding you triaged (whether fix, push-back, or defer), post a reply:
 Reply format:
 - **Fixed:** Brief description of what was changed
 - **Pushed back:** Technical reasoning why the code is correct as-is
-- **Deferred:** Acknowledgment + what follow-up looks like
+- **Deferred:** Why it is a major refactor + the link to the issue you filed
 
 ### 9. Push
 
@@ -196,7 +198,7 @@ This triggers a new bot review for the next round.
 
 ### 10. Check for early exit
 
-If this round had **zero actionable findings** (all findings were pushed back or deferred with valid reasoning, and CI is green), the loop terminates early. Do NOT push an empty commit.
+If this round had **zero actionable findings** (every finding was pushed back, and CI is green), the loop terminates early. A round that deferred a finding is not clean unless each deferral is a major refactor with a filed issue. Do NOT push an empty commit.
 
 ## Termination and Report
 
@@ -220,7 +222,7 @@ The loop ends when:
 
 | # | Finding | Severity | Decision | Detail |
 |---|---|---|---|---|
-| 1 | <brief> | <severity as reported by reviewer> | Fixed / Pushed back / Deferred | <one-line explanation> |
+| 1 | <brief> | <severity as reported by reviewer> | Fixed / Pushed back / Deferred (#issue) | <one-line explanation> |
 | ... | ... | ... | ... | ... |
 
 Actionable findings remaining at termination: <n>

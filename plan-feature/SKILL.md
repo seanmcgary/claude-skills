@@ -74,6 +74,11 @@ findings, then write a spec as an issue comment. Write the spec in
   the premise check against it.
 - Brainstorming's one-question-at-a-time rule is **overridden**: collect all clarifying questions
   into one batched issue comment (see above).
+- **An out-of-scope list names features the issue does not ask for. It never names defects.** A
+  known gap on the feature's path goes into the plan as a task: a check the server does not
+  enforce, a promise the UI makes with no job behind it, a shared primitive the feature exposes.
+  Reviewers and executors read this list later. A defect written here as "not addressed" becomes
+  permission to ship it. See "Implement, don't defer" in `conventions.md`.
 
 ## Phase 3 — Design sync
 

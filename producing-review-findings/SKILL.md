@@ -87,31 +87,51 @@ above. Each subagent receives:
   has never seen this diff can apply it after reading only the named file: name the symbol, the
   line, and the concrete change. `consider`, `improve`, `ensure`, `handle properly` and `review`
   are banned — each pushes the derivation you were dispatched to do back onto whoever fixes it.
-  If you cannot write a fix that specifically, say so in the cell and give your reasoning; the
-  triage will Defer it."
+  If the fix spans layers or needs design work (a migration, a proto field, several files), write
+  the goal and the acceptance criteria instead and mark the cell `cross-cutting`. Report real
+  defects in code the diff touches or depends on even when they are pre-existing: the pipeline
+  leaves code better than it found it."
 
 If a reviewer returns garbage (no structured findings, off-topic, or fewer than 3 sentences), re-dispatch that single reviewer once with a more explicit prompt. If the re-dispatch also returns garbage or off-topic output, perform that dimension's review yourself inline in the current context using the same rubric, and note the fallback in the artifact.
 
 ### 3. Triage findings
 
+Apply "Implement, don't defer" in `$SKILLS_ROOT/feature-pipeline/conventions.md` to every finding.
+The issue and the approved plan describe the outcome. They do not fence off what may be fixed.
+
+Before you triage, collect the existing debt on the branch's path: `git grep -n "TODO(review"` over
+the files the diff touches, and `gh issue list --search "<symbol>"` for the symbols a finding names.
+Each old `TODO(review…)` in a touched file is a finding of its own. A finding that matches an
+earlier deferral is Fix, whatever its size.
+
 For each finding from every reviewer, decide:
 
-- **Fix:** the finding is real and in scope. It goes in the artifact's `### Fix` section. **You do
-  not implement it.** If the reviewer's prescribed fix is vague, sharpen it here — you have the
-  whole picture and the executor will not — or move the finding to Defer with your reasoning.
+- **Fix:** the finding is real. This is the default, whatever the severity, and whether the defect
+  is pre-existing, outside the diff, or absent from the plan. It goes in the artifact's `### Fix`
+  section. **You do not implement it.** If the reviewer's prescribed fix is vague or wrong, write
+  the correct one here — you have the whole picture and the executor will not. If the fix spans
+  layers or needs design work, it goes in `### Fix — cross-cutting` with a goal and acceptance
+  criteria. A product or design choice that nothing specifies is also Fix: pick the option, and
+  start the finding with `Decision:` and the reason.
 - **Reject:** the finding is incorrect or not applicable (same concept pr-feedback-loop calls "push back" -- disagree with reasoning, don't apply). State why in one line.
-- **Defer:** the finding is real but out of scope for this branch. Name the file and line where a
-  TODO comment citing the finding belongs. **You do not write it** — this skill touches no file
-  after the gates, and the executor is already going to open that file.
+- **Defer:** ONLY a major refactor, as `conventions.md` defines it. File the issue now with
+  `gh issue create`, and put its number in the Defer row. You do not write a `TODO` comment, and
+  neither does the executor.
+
+Two more sections take what is neither a fix nor a deferral: `### Decisions needed` for a question
+an agent does not own alone (a public price, new recurring cost, legal or compliance), and
+`### Pre-merge checks` for a check that cannot run headless.
 
 Deduplicate across reviewers: two dimensions reporting the same line are one finding with both
 dimensions named.
 
-Reject and Defer are decisions you make and justify, not questions for the human.
+Reject and Defer are decisions you make and justify, not questions for the human. Before you post,
+read your Defer table once more. Each row must be a major refactor with an issue number. Move any
+other row to Fix.
 
 ### 4. Write the findings artifact
 
-Group every `Fix` finding **by file**, and write the artifact exactly as
+Group every `Fix` finding **by file**, put each cross-cutting finding under its own heading, and write the artifact exactly as
 `$SKILLS_ROOT/feature-pipeline/review-findings.md` specifies — including the `Tests:` line per
 group (the narrowest command covering that file, never the full suite) and the overflow rule.
 

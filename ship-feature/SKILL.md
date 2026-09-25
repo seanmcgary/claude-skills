@@ -153,11 +153,15 @@ stage-5 rounds. It stays a draft until stage 5.
    suite runs once at stage 4; see the "Test cadence" section in `conventions.md`); frontend: run
    the app, drive it, screenshot at the plan's breakpoints, a11y check, fast gates; full-stack:
    also verify the seam end-to-end (real UI action → real API → real data layer).
-2. Apply the **Review Cadence**: dispatch a per-task reviewer (at the `senior` tier) ONLY for
+2. **Every implementer dispatch carries the headless override** defined in `build-feature`
+   phase 2 (decide rather than ask, leave touched files better, no `TODO` comments, no deferred
+   work). Append it verbatim to each implementer's prompt, and fix a task reviewer's Minor
+   findings in the task's fix round rather than recording them as deferred.
+3. Apply the **Review Cadence**: dispatch a per-task reviewer (at the `senior` tier) ONLY for
    tasks tagged `review: yes`; `review: no` tasks are gated by their own acceptance criteria. Do
    NOT run subagent-driven-development's final whole-branch review — stage 4 is the single
    fan-out. Any re-review is scope-bounded to the fix.
-3. Update Pipeline State.
+4. Update Pipeline State.
 
 ### Stage 4: Commit Review
 
@@ -188,7 +192,9 @@ stage-5 rounds. It stays a draft until stage 5.
    skipped the stage-1 draft). If the `### Decisions` list has entries, the body carries a
    **"Deviations from the approved plan"** section built from it — one bullet each, naming what
    the plan said, what you did, and why. A run with deviations and no such section has hidden
-   them.
+   them. The body also carries "Decisions needed", "Pre-merge checks", and "Deferred refactors"
+   (each linking its filed GitHub issue) when they have entries, exactly as `build-feature`
+   phase 4 defines them, and no other section for unfinished work.
 2. Invoke `pr-feedback-loop` with N=3. It waits for review, triages findings, applies fixes,
    replies to threads, and repeats for up to N rounds. (It sees the PR already open and skips its
    own create-PR setup; the `docs:` spec/plan commits do not match its round-counter grep, so
@@ -263,8 +269,9 @@ list as a **"Deviations from the approved plan"** section in the PR body at stag
 reviews these at the PR, with the diff in front of them, which is a better review than the same
 question answered blind mid-run.
 
-The one thing a deviation may never do is quietly widen scope. If the fix takes the feature
-somewhere the request did not ask to go, say so plainly in the entry and in the PR body.
+The plan describes the outcome, not a boundary. Widening the work to leave the code better is
+expected; what a deviation may never do is go unlogged. Nothing is deferred except a major
+refactor, filed as a GitHub issue — see "Implement, don't defer" in `conventions.md`.
 
 **The pipeline NEVER merges.** It ends with a status report. Merging is a human decision.
 
