@@ -15,7 +15,11 @@ or buries in noise. The goal: round 1 of PR review should find nothing mechanica
    precondition), the reviewer fan-out over the branch diff, triage into Fix / Reject / Defer, and
    the findings artifact.
 2. **`executing-review-findings`** — one fresh-context subagent per file group applying that
-   artifact's Fix findings, targeted tests per group, then the full suite once.
+   artifact's Fix findings, then a senior-tier subagent per cross-cutting finding, targeted tests
+   per group, then the full suite once.
+
+Triage follows "Implement, don't defer" in `$SKILLS_ROOT/feature-pipeline/conventions.md`: a real
+finding is Fix, and only a major refactor is deferred, as a filed GitHub issue.
 
 Follow each of those skills exactly. This file adds only what composing them changes.
 

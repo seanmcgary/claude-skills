@@ -8,6 +8,8 @@ Companion files: [`pipeline-state.md`](pipeline-state.md) (the plan/build handof
 [`review-findings.md`](review-findings.md) (the review/remediation handoff contract),
 [`profiles/`](profiles/) (per-domain slices), and [`tiers.md`](tiers.md) (the model resolver).
 
+The rule every skill applies to a real finding is **"Implement, don't defer"**, below.
+
 ## Portability across agents
 
 These skills are agent-agnostic. They reference a **skills root** and **sub-skill intents**, not
@@ -99,6 +101,7 @@ other agent.
 | Reviewer subagents — plan review and commit review | senior | high |
 | Per-task implementation (`build-feature`; `ship-feature` stage 3) | mid | default |
 | Per-group remediation subagents (`executing-review-findings`) | mid | default |
+| Cross-cutting remediation subagents (`executing-review-findings`) | senior | high |
 | Orchestration + review triage | senior | high |
 
 Remediation sits at `mid` for the same reason implementation does, and the reason is the artifact:
@@ -119,6 +122,80 @@ model parameter so the subagent inherits the invoking session's model — that i
 fallback for an unmapped agent, not a silent defeat of the tiering.
 
 If the executor struggles, the fix is a better-specified plan — not a more expensive executor.
+
+## Implement, don't defer
+
+This section is the single definition of when work may be deferred. Every skill in this pipeline
+that plans, implements, reviews, or triages applies it. None redefines it.
+
+**The issue and the approved plan describe the outcome. They are not a boundary.** Every agent in
+this pipeline, the implementers and the reviewers alike, is trusted to leave the code better than
+it found it. A real defect found while doing the work is fixed while doing the work.
+
+### A real finding is Fix
+
+Fix it in this run. None of these is a reason to do anything else:
+
+- **"Pre-existing."** The defect was there before this branch.
+- **"Outside this branch's diff."** The fix is in a file, package, or layer the branch does not
+  otherwise touch.
+- **"The plan did not mention it"** or **"the plan made the opposite choice."** Fixing it is a
+  deviation. Log it as a deviation (see `build-feature`'s Autonomy contract) and do it.
+- **"The spec lists it as not addressed."** A spec's out-of-scope list says what the issue does
+  not ask for. It never permits a defect to stay on the feature's path.
+- **"It needs a migration, a proto field, a schema change, or a new test harness."** That is work,
+  not a reason to skip work. Nothing has shipped that makes the change hard to reverse.
+- **"It changes a shared primitive or token, so it restyles every consumer."** Make the change,
+  check the consumers, and log it as a deviation.
+- **"It spans several file groups"** or **"it is not a mechanical edit."** Use a cross-cutting
+  Fix (see `review-findings.md`).
+- **"The reviewer's prescribed fix is wrong"** or **"it is hard to specify."** Write the right fix.
+- **"LOW severity," "cosmetic," "it needs a test," "it is bounded today."** Fix it.
+
+### Never deferrable
+
+These are always Fix, whatever size the fix is:
+
+- Security, authorization, entitlement, tenant isolation, and data integrity.
+- Anything the feature advertises or depends on. If the UI says "kept for 30 days," the job that
+  enforces 30 days is in scope.
+- A defect this branch introduced, or made reachable, or made load-bearing.
+- A finding that was already deferred once, as a `TODO` comment or an open issue. The second time,
+  it is Fix.
+
+### The one exception: a major refactor
+
+Defer a finding only when the fix is a **major refactor**. All of these must be true:
+
+1. The fix restructures a subsystem or a module boundary across many consumers. It is a project of
+   its own, not a change to some files.
+2. The branch's own behavior is correct and safe without it.
+3. It is not on the "never deferrable" list above.
+
+A deferred finding becomes a **GitHub issue**, never a `TODO` comment:
+
+```bash
+gh issue create --title "<type>(<scope>): <the refactor>" --body-file <file>
+```
+
+The issue body states the finding, the evidence (file and line), why it is a major refactor, and
+the approach you recommend. Link the issue number from wherever the finding is recorded (the
+findings artifact, the PR body, the thread reply). Do not write `TODO` comments for deferred
+work. When you touch a file that carries an older `TODO(review…)` comment, fix what it describes,
+or move it to an issue by this same rule and delete the comment.
+
+### Not deferrals: decisions and manual checks
+
+Two kinds of finding are not fixes an agent can finish alone. Neither is a deferral, and neither
+is a `TODO`:
+
+- **A decision.** A product or design choice that no plan, spec, or design file makes. Make the
+  choice yourself, implement it, and log it as a deviation. The human reviews it at the PR. The
+  exceptions are decisions an agent does not own alone: a public price, new recurring cost, a
+  legal or compliance surface. For those, list the question in the PR body's
+  **"Decisions needed"** section and @-mention `@seanmcgary`.
+- **A manual check.** A check that cannot run in a headless environment (a device, a simulator,
+  VoiceOver, a real vendor build). List it in the PR body's **"Pre-merge checks"** section.
 
 ## Review cadence: one authoritative pass; converge, don't ratchet
 

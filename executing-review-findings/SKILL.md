@@ -9,8 +9,9 @@ Remediation, not review. A review already happened: every finding is located, se
 carries a prescribed fix. This skill applies them and nothing else.
 
 **It does not re-review.** It does not re-read the diff looking for what the reviewers missed, and
-it does not second-guess a `Reject` or promote a `Defer`. Re-reviewing here is the ratchet
-`conventions.md` warns about, paid for twice.
+it does not second-guess a `Reject`. Re-reviewing here is the ratchet `conventions.md` warns
+about, paid for twice. That is not a limit on fixing: a subagent that sees a real defect in a file
+it already holds fixes it, per "Implement, don't defer" in `conventions.md`.
 
 **Why this is its own skill.** Measured across eight real review runs, remediation was 92% of the
 cost of review, because it ran in the reviewing session's context — which grew from 66k to 321k
@@ -42,7 +43,8 @@ and the result would not be the round the human read.
 
 ### 1. Form the groups
 
-The artifact is already grouped: each `####` heading under `### Fix` is one group. Take them as
+The artifact is already grouped: each `####` heading under `### Fix` is one group. The `####` headings
+under `### Fix — cross-cutting` are not groups; step 3 applies them after the fan-out. Take them as
 written. Two adjustments, and no others:
 
 - **Merge groups that name each other.** A finding whose prescribed fix says `Also touches:
@@ -83,17 +85,30 @@ Each subagent receives, and nothing more:
   > If a finding is wrong — the code does not say what the finding says it says — do not implement
   > it and do not invent a substitute. Report it back by its number with one line of reasoning.
   >
-  > Report: findings applied by number, findings not applied by number with the reason, files
-  > changed, and your test command's final result.
+  > Leave your files better than you found them. If you see a real defect in a file on your list
+  > that your table does not name, fix it and cover it with a test. "Pre-existing" and "not in my
+  > table" are not reasons to leave it. Do not write `TODO` comments.
+  >
+  > Report: findings applied by number, findings not applied by number with the reason, the
+  > additional defects you fixed, files changed, and your test command's final result.
 
 **Do not commit inside a subagent.** The orchestrator commits, once per group, after that group
 returns — concurrent subagents sharing one index is the same lost-write hazard as sharing a file.
 
-### 3. Place the deferred TODOs
+### 3. Cross-cutting fixes
 
-For each `### Defer` row, write a `TODO` comment citing the finding at the location the artifact's
-`Place TODO at` column names. Do this in the orchestrator, after the fan-out, so it cannot collide
-with a subagent's edit.
+After every file group has returned and been committed, apply each `### Fix — cross-cutting`
+finding. Give each one a fresh subagent at the `senior` tier (resolve it per `tiers.md`), with the
+finding's heading block verbatim, its file list, its `Tests:` command, and the path to the
+conventions doc. It may edit every file its finding names, and it implements the goal until every
+acceptance criterion holds. Dispatch cross-cutting findings whose file lists do not overlap in one
+message. Run overlapping ones one after another. Commit once per finding as it returns.
+
+A group that reported it could not finish a finding without a file another group held is handled
+here too: apply that fix yourself, or give it to a cross-cutting subagent.
+
+The artifact's `### Defer` rows already carry their GitHub issues. Do nothing for them, and write
+no `TODO` comments.
 
 ### 4. Full suite, once
 
@@ -112,8 +127,13 @@ Post one comment covering the whole round:
 
 - Every `Fix` finding by number: applied, or not applied with the reason.
 - Every finding a subagent reported wrong, with its reasoning, and your decision.
-- The deferred TODOs you placed.
+- Every cross-cutting finding: applied, with how each acceptance criterion was met.
+- The additional defects subagents fixed beyond the table.
+- The Defer rows' issue numbers, as links.
 - The full suite's result and anything you fixed after it.
+
+Copy the artifact's `### Decisions needed` and `### Pre-merge checks` rows into the pull request
+body under sections of the same names, and log every `Decision:` fix as a deviation.
 
 Do not restate the `Reject` and `Defer` reasoning — the findings artifact already carries it and
 the human has read it. Link to the artifact comment instead.
@@ -134,10 +154,9 @@ work is fresh, full once in the phase that owns whole-branch verification.
 PARK rather than guess when:
 
 - Pipeline State names no `findings comment`, or the comment it names does not exist.
-- A group reports it cannot fix a finding without editing a file held by another group, and the
-  merge that would resolve it is not obvious from the artifact.
 - The full suite is still red after your fixes.
-- A finding's prescribed fix contradicts the code, and the correct change is a design decision
-  rather than a repair.
+- A finding needs an answer only the owner can give (a public price, new recurring cost, a legal
+  or compliance surface). Any other design decision is yours: make it, apply it, and log it as a
+  deviation.
 
 Parking states what you need and stops. It does not turn into a re-review.
