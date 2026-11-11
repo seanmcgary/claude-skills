@@ -22,6 +22,15 @@ for a Small change that skips the spec, in the plan's Global Constraints preambl
 - **Prior art** — is there an existing config, pattern, or host to reuse instead of inventing one?
 - **Profile + class** — set the active profile(s) and the Right-Sizing class per `conventions.md`,
   and record both in Pipeline State with a one-line reason.
+- **Ask fidelity** — copy the issue's acceptance criteria, "Done when" bullets, and "Out of
+  scope"/"Not in scope" bullets into the spec verbatim. They are the contract. A design doc the
+  issue links to tells you *how*. It is not a second source of *what*. A requirement that appears
+  only in the design is out of scope unless the issue says "per the design" for that section. If
+  you include one anyway, list it under `### Taken from the design, not the issue` in the spec,
+  with one line on why it cannot wait for the issue that owns it.
+  Rewrite a criterion that needs a live environment ("against dev", "recorded fixtures") as the
+  in-repo test that proves it, and log the rewrite as a Decision (see "No live-environment
+  acceptance" in `conventions.md`).
 
 If an answer is unknown after a reasonable search, that is itself a finding — surface it, do not
 paper over it with a plausible guess.

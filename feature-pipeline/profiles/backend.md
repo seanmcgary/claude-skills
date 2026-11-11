@@ -12,9 +12,9 @@ A profile supplies three slices, each consumed by a different phase. **`plan-fea
 - **Risky boundary:** auth/authz, payments/money, PII or credentials, data integrity, transactions, concurrency, migrations, or anything on a security-relevant path. Touching one → at least Standard, usually Large.
 - **Mechanical vs. semantic:** a signature-preserving refactor, a rename, or a default-off flag is Mechanical even across many files; anything requiring per-site reasoning about new behavior is semantic.
 
-**Task shapes to author:** migration (+ registration), request/response type + validation, route/handler wired to its auth mechanism, service method, data-access method scoped by owner/tenant, and a test step per producing task. Order so schema precedes the code that reads it.
+**Task shapes to author:** migration (+ registration), request/response type + validation, route/handler wired to its auth mechanism, service method, data-access method scoped by owner/tenant, and a test step per behaviour, at the outermost surface that exercises it. Order so schema precedes the code that reads it.
 
-**Per-task `review:` tag** — flag `review: yes` for tasks that touch a risky boundary (auth, money, migrations, raw queries, concurrency, cross-tenant data); flag `review: no` for mechanical/transcription tasks whose correctness the whole-diff fan-out will still cover. See `conventions.md`'s Review Cadence for how the tag is used.
+**Per-task `review:` tag** — flag `review: yes` only for a task that writes a migration, an auth check, a raw query, cross-tenant data access, or money/position arithmetic. Validation, parsing, protos, fakes, and test code are `review: no`; the whole-diff fan-out still covers them. If more than a third of tasks are `review: yes`, the plan is under-specified: fix the plan. See `conventions.md`'s Review Cadence for how the tag is used.
 
 **Per-task acceptance to bake in:** the covering test(s) pass; error paths return/handle explicitly; the change respects the Global Constraints copied into the plan.
 
@@ -33,7 +33,7 @@ already knows how to reach; the frontend profile is where verification diverges.
 The backend reviewer rubric **is** the security / quality / standards rubric already written into `reviewing-plans` (stage 2) and `reviewing-commits` (stage 4). Use those rubrics verbatim — they are the backend dimensions:
 
 - **Security:** auth on every route + a test proving it; tenant/owner isolation on every query + a cross-tenant rejection test; no injection; validated request fields; no secrets in logs; race conditions in read-then-write paths; crypto hygiene; metadata-only reads on sensitive resources.
-- **Quality:** test per new function; error-path completeness; deterministic user-facing output; interface consistency (Produces/Consumes).
+- **Quality:** one test per behaviour, at the outermost surface; simplicity (delete no-caller code); error-path completeness; deterministic user-facing output; interface consistency (Produces/Consumes).
 - **Standards:** routing/handler convention, schema/enum conventions, migration registration, doc-sync/codegen, logging style, commit-message format.
 
 No profile-specific additions or removals — this profile is the rubric's native domain.

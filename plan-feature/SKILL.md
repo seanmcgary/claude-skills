@@ -13,8 +13,8 @@ Shared reference — **read these at the paths below** (they are siblings of thi
 `$SKILLS_ROOT/feature-pipeline/`; see the portability section in `conventions.md`); do not
 redefine their contents here:
 
-- `$SKILLS_ROOT/feature-pipeline/conventions.md` — profiles, right-sizing, model tiering,
-  review cadence, test cadence, owner notifications
+- `$SKILLS_ROOT/feature-pipeline/conventions.md` — project standards docs and the testing
+  guide, profiles, right-sizing, model tiering, review cadence, test cadence, owner notifications
 - `$SKILLS_ROOT/feature-pipeline/pipeline-state.md` — the handoff contract with
   `build-feature`
 - `$SKILLS_ROOT/feature-pipeline/profiles/{backend,frontend,seam}.md` — per-domain slices
@@ -62,9 +62,26 @@ stale — is reconciled in the plan and is not a block.
 
 ## Phase 2 — Brainstorm + spec
 
-Invoke `brainstorming` (the host's design-exploration skill; see the sub-skill intent map in
-`conventions.md`) to explore design space, requirements, and edge cases, informed by the phase-1
-findings, then write a spec as an issue comment. Write the spec in
+**Before you brainstorm, resolve and read the project's standards docs** per "Project standards
+docs" in `conventions.md`: the conventions doc set (including `CONVENTIONS.md` and docs it links
+to) and the testing guide (`TESTING.md`, root or scoped). The spec and plan are built on these
+rules from the start; do not leave them for the reviewers to find. When a testing guide exists,
+the spec's testing approach follows it: name the behaviours to test and the level each belongs
+at, and do not propose a test the guide bans.
+
+**A linked design you cannot fetch** (a hosted artifact, a JS-rendered page, a doc in another
+repo): look for a committed copy under `docs/design/<epic or feature>/` first, and use it if it
+exists. If none exists, park once **per epic**, asking for the design to be committed as a file,
+and cite that path in every later sub-issue. Do not park again for the same artifact.
+
+**An issue that already carries a design** (an API, a rules table, numbered acceptance criteria)
+**skips brainstorming.** The design work is done, and brainstorming an already-designed feature
+only widens it. Write the spec as a requirement checklist: one row per issue sentence, each
+marked `issue` or `design` (see "Ask fidelity" in the premise check).
+
+Brainstorm only when the issue states a problem without a design. Then invoke `brainstorming`
+(the host's design-exploration skill; see the sub-skill intent map in `conventions.md`), informed
+by the phase-1 findings, and write the spec as an issue comment. Either way, write the spec in
 **Simplified Technical English (ASD-STE100)** — see the writing-style section in `conventions.md`.
 
 - **Small changes:** skip both brainstorming and the written spec once the premise check is
@@ -148,6 +165,14 @@ top. Write all plan prose in **Simplified Technical English (ASD-STE100)** — s
 `Verified external API`, the checkbox/agentic-worker header, and profile-shaped tasks. Do not
 restate it here.
 
+Every test step obeys the testing guide you read in phase 2, and the Global Constraints
+preamble lists the guide's path so the executor opens it too.
+
+**Size budget.** The executor has the issue, the conventions doc, and the testing guide. Aim for
+a spec plus plan of at most 5× the issue body's word count. Over 10× is a transcript of the
+program, not a plan. Do not restate design tables the executor can read from a committed file:
+cite the file.
+
 Two requirements are specific to this skill:
 
 - **Location:** the plan is an **issue comment**, not a repo file. Do not create
@@ -178,6 +203,14 @@ Post the gate as an issue comment, @-mentioning `@seanmcgary`:
 > The plan has been reviewed across the active profile's dimensions. To approve: apply the
 > `status:ready-for-execution` label. To request changes: comment what you want changed and
 > re-add `status:ready-for-spec`.
+
+**Sign-off items.** If the issue marks anything "needs review", "needs sign-off", or "decide at
+the gate" — or the plan commits something sensitive, such as confidential fixtures — list each
+as a **numbered yes/no question** in the gate comment, and add: "The label approves the plan's
+defaults except the numbered sign-off items; reply with each number and yes or no. An unanswered
+item is dropped." Keep the list to items that truly need a human; the rest are logged defaults.
+`build-feature` does not build an item without a "yes"; it records it as a `Dropped (sign-off not
+given)` Acceptance row.
 
 Then **STOP**.
 

@@ -35,9 +35,13 @@ If the body carries a `### Parts` list, fetch each listed ID in order and concat
 request under review also carries bot reviews, human comments, and earlier rounds; listing and
 searching them is how you end up fixing the wrong round.
 
-**No `findings comment` field, or the comment does not exist: PARK.** Do not reconstruct the
-artifact by re-reviewing the branch — that is the expensive session this skill exists to remove,
-and the result would not be the round the human read.
+**No `findings comment` field: resolve it, do not park.** If Pipeline State also lacks `pr`, run
+`gh pr list --head <branch> --state open`; exactly one result is the PR. On that PR, take the
+comment carrying the `agent-utils:findings` marker with the highest `round=` (the manifest if
+the round has parts). Write both IDs into Pipeline State and continue. **PARK** only when there
+are zero or several open PRs, no marked comment, or the named comment does not exist. Never
+reconstruct the artifact by re-reviewing the branch — that is the expensive session this skill
+exists to remove, and the result would not be the round the human read.
 
 ## Process
 
@@ -68,7 +72,8 @@ Each subagent receives, and nothing more:
 
 - Its group's file list and its group's findings table, verbatim from the artifact.
 - Its group's `Tests:` command.
-- The path to the conventions doc.
+- The paths of every file in the conventions doc, and the testing guide's path (or "none"),
+  resolved per "Project standards docs" in `$SKILLS_ROOT/feature-pipeline/conventions.md`.
 - These instructions:
 
   > Apply every finding in your table. The `Prescribed fix` column tells you the change; a review
@@ -86,8 +91,13 @@ Each subagent receives, and nothing more:
   > it and do not invent a substitute. Report it back by its number with one line of reasoning.
   >
   > Leave your files better than you found them. If you see a real defect in a file on your list
-  > that your table does not name, fix it and cover it with a test. "Pre-existing" and "not in my
-  > table" are not reasons to leave it. Do not write `TODO` comments.
+  > that your table does not name, fix it, and add a test only if one would catch it.
+  > "Pre-existing" and "not in my table" are not reasons to leave a defect. Do not add options,
+  > validation, or API nothing calls. Do not write `TODO` comments.
+  >
+  > Before you write or change a test, read the testing guide. Every test you write obeys it. If
+  > a finding prescribes a test the guide bans, do not write it; report it back by its number
+  > and cite the guide's section.
   >
   > Report: findings applied by number, findings not applied by number with the reason, the
   > additional defects you fixed, files changed, and your test command's final result.
@@ -99,10 +109,10 @@ returns — concurrent subagents sharing one index is the same lost-write hazard
 
 After every file group has returned and been committed, apply each `### Fix — cross-cutting`
 finding. Give each one a fresh subagent at the `senior` tier (resolve it per `tiers.md`), with the
-finding's heading block verbatim, its file list, its `Tests:` command, and the path to the
-conventions doc. It may edit every file its finding names, and it implements the goal until every
-acceptance criterion holds. Dispatch cross-cutting findings whose file lists do not overlap in one
-message. Run overlapping ones one after another. Commit once per finding as it returns.
+finding's heading block verbatim, its file list, its `Tests:` command, and the paths of the
+conventions doc and the testing guide. It may edit every file its finding names, and it
+implements the goal until every acceptance criterion holds. Dispatch cross-cutting findings
+whose file lists do not overlap in one message. Run overlapping ones one after another. Commit once per finding as it returns.
 
 A group that reported it could not finish a finding without a file another group held is handled
 here too: apply that fix yourself, or give it to a cross-cutting subagent.
@@ -153,7 +163,7 @@ work is fresh, full once in the phase that owns whole-branch verification.
 
 PARK rather than guess when:
 
-- Pipeline State names no `findings comment`, or the comment it names does not exist.
+- No findings comment can be resolved (see Input), or the comment Pipeline State names does not exist.
 - The full suite is still red after your fixes.
 - A finding needs an answer only the owner can give (a public price, new recurring cost, a legal
   or compliance surface). Any other design decision is yours: make it, apply it, and log it as a

@@ -56,7 +56,8 @@ When `decisions` is non-zero, a `### Decisions` list follows the table in the sa
 - **`pr`** — the pull request. `#<n> (draft)` when `plan-feature` opened one to carry design
   assets — `build-feature` PROMOTES that PR (`gh pr ready`) rather than opening a second one.
   `n/a` when no design assets were synced, in which case `build-feature` opens the PR itself at
-  stage 5.
+  stage 5. A missing or stale `pr` is not a blocker: any skill resolves it with
+  `gh pr list --head <branch> --state open` (exactly one result) and writes it back.
 - **`findings comment`** — the numeric ID of the review's **findings comment** (see
   [`review-findings.md`](review-findings.md)), or `n/a` before a review has run. Written by
   `producing-review-findings`; read by `executing-review-findings`, which fetches exactly that one
@@ -77,7 +78,8 @@ When `decisions` is non-zero, a `### Decisions` list follows the table in the sa
   said, what was done instead, and why, in that order. The list is the source the PR body's
   "Deviations from the approved plan" section is written from, so it must be complete before
   the PR is readied: the human reviews these decisions at the PR, not at the moment they are
-  made.
+  made. This list is the one record. The PR section must match it entry for entry; a PR
+  deviation absent from this list is a defect the commit review flags.
 
 ## Resume
 
