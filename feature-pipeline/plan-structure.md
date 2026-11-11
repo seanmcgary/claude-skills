@@ -12,11 +12,13 @@ Immediately after the Architecture block, a `## Global Constraints` section **ci
 conventions this feature can touch — one line per rule: its name, where it is enforced, and a
 link. Do NOT copy their text.
 
-The conventions doc (the first that exists at the repo root: `AGENTS.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `STANDARDS.md`/`STYLEGUIDE.md`) is already loaded into every agent session in
-that repo, executors included, so reproducing it in the plan duplicates what the reader already
-has — and pays for it again on every execution run. The value of this section is the
-**selection**: which rules bite for THIS change. That survives at a fraction of the size.
+The conventions doc (the resolved set in "Project standards docs" in `conventions.md`) is in
+the repo for every executor to read, so reproducing it in the plan duplicates what the reader
+already has — and pays for it again on every execution run. The value of this section is the
+**selection**: which rules bite for THIS change, and the **path** to each doc they come from.
+Only `AGENTS.md`/`CLAUDE.md` load automatically, so a rule from `CONVENTIONS.md`, `TESTING.md` or
+a scoped doc must carry its file path, or the executor never opens it. If the repo has a testing
+guide and the plan has a test step, list the testing guide here.
 
 ```markdown
 ## Global Constraints
@@ -56,5 +58,16 @@ Per the active profile's planner slice, each with a `review: yes|no` tag and con
 criteria** — the exact checks that prove it done. For UI tasks that means the breakpoints to
 render, the tokens to match, and the keyboard/focus/reduced-motion checks. These criteria are what
 let a mid-level executor verify its own work and what reviewers grade against.
+
+When the repo has a testing guide (see `conventions.md`), each test step names the behaviour it
+proves and, where the guide asks for it, the bug it catches. One behaviour gets one test, at the
+outermost surface that exercises it.
+
+`writing-plans`' "Review Focus" section is **optional** here. List at most the failure modes the
+issue's acceptance criteria imply but do not name, and plan a test for one only when it names a
+bug the test catches. An empty section is the normal result for an issue that already carries
+acceptance criteria. Do not plan a test the guide bans.
+An acceptance criterion that a banned test would "prove" is wrong evidence; name the behavioural
+test instead.
 
 For a full-stack change, fix the API contract first (seam addendum) so both sides build to it.

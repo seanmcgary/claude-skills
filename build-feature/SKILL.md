@@ -27,18 +27,29 @@ to inherit the invoking session's model when resolution falls back to `inherit`.
 
 ## Preconditions
 
-1. **The issue carries `status:ready-for-execution`.** That label is your authorization to write
-   code. Without it, REFUSE and direct the user to `plan-feature`. Never plan here, never
+1. **The issue carries `status:ready-for-execution`** — or it carries `status:needs-execution-input`
+   or `status:ready-for-review` and Pipeline State is at stage >= 3, which is a resume (see
+   Phase 4). The label is your authorization to write code. Without one of these, REFUSE and
+   direct the user to `plan-feature`. Never plan here, never
    re-open the gate, never apply the label to yourself.
 2. **The issue has an approved plan with a `## Pipeline State` block.** If the block is missing,
    REFUSE — do not reconstruct it. The fields you would have to guess (`branch`,
    `design assets`) are precisely the ones that cause silent data loss when guessed wrong.
+3. **Every issue under the plan's or issue's "Depends on" is closed**, or the plan names the merged
+   PR that satisfies it. If not, post one comment listing the open dependencies, keep
+   `status:ready-for-execution`, and stop with a status report. Do not set
+   `status:needs-execution-input`: nothing is needed from a human, and the next invocation
+   re-checks.
 
 ## Phase 0 — Load state and resolve the branch
 
 Read the plan and the `## Pipeline State` block: `class`, `profile`, `branch`, `pr`,
 `design assets`, `stage`. Load the profile file(s). Materialize a local, UNCOMMITTED working
 copy of the plan for executor tooling (`task-brief` / `review-package`).
+
+Read the gate comment's numbered **sign-off items**, if any, and the human's replies. An item with
+no explicit "yes" is dropped: do not build it. It gets a `Dropped (sign-off not given)` row in the
+PR's Acceptance table (see Phase 4), linking the gate question.
 
 **Resolve the branch — this is where work gets destroyed if you get it wrong:**
 
@@ -63,8 +74,10 @@ git fetch origin
   Never force-push over a conflict, and never drop one side to make a conflict go away.
 
 **Resolve the PR:** if `pr` names a draft, that PR is yours to finish — push to its branch and
-promote it at stage 5. Do **not** open a second PR for the same branch. If `pr` is `n/a`, you
-open the PR at stage 5.
+promote it at stage 5. Do **not** open a second PR for the same branch. If `pr` is `n/a` or
+missing, run `gh pr list --head <branch> --state open`: exactly one result is the PR — write it
+into Pipeline State and continue. Zero results means you open the PR at stage 5. Park only when
+there are several.
 
 ## Phase 1 — Design fidelity (before you write UI code)
 
@@ -97,10 +110,22 @@ task alone. Append it verbatim to each implementer's prompt:
 
 > You run headless, and no one will answer a question. The plan describes the outcome, not a
 > boundary. When the plan did not anticipate something, decide it, do it, and list it under
-> "Decisions" in your report with what the plan said, what you did, and why. Leave every file you
-> touch better than you found it: fix real defects you see there, pre-existing or not, and cover
-> them with tests. Do not write `TODO` comments, and do not report work as deferred. Return
-> BLOCKED only for build-feature's blockers: the plan is impossible, or a design file is missing.
+> "Decisions" in your report with what the plan said, what you did, and why. Fix real defects
+> you see on the feature's path, pre-existing or not, and list each under "Decisions". Do not add
+> exported API, options, or validation that nothing in this plan calls. Do not write `TODO`
+> comments, and do not report work as deferred. Return BLOCKED only for build-feature's
+> blockers: the plan is impossible, or a design file is missing.
+>
+> Before you write or change a test, read the testing guide: <path, or "none">. Every test you
+> write obeys it; where it conflicts with the plan or with the rules below, the guide wins, and you report that under
+> "Decisions". Every test carries a one-line comment naming the production change that makes it
+> fail. Before you commit, delete any test whose comment you cannot write, any table row that
+> proves nothing another row does not (keep boundary rows), and any test that pins a behaviour a public-surface
+> test in this package already pins. One behaviour, one test, at the outermost surface that
+> exercises it.
+
+Before the first dispatch, resolve the conventions doc and the testing guide per "Project
+standards docs" in `conventions.md`, and fill the testing-guide path into the override.
 
 Copy each reported decision into the `### Decisions` list. A task reviewer's Minor findings are
 fixed in the same fix round as the task's other findings. They are not recorded as deferred.
@@ -137,7 +162,9 @@ This is the **one authoritative whole-diff fan-out**.
 **Check for a PR review bot before deciding the weight** (see `conventions.md` → repositories
 without a PR review bot). If the repo has none, "the bot will catch it" is not available as a
 reason to review less: run the fan-out, or at absolute minimum gates + a genuine self-review.
-Never leave a diff with no review at all.
+Never leave a diff with no review at all. If the repo has **two or more** review bots, apply
+rule 5 of the Review Cadence instead: one combined reviewer, plus security for `review: yes`
+tasks.
 
 The triage applies "Implement, don't defer" from `conventions.md`: a real finding is Fix, whether it
 is pre-existing, outside the diff, or absent from the plan, and only a major refactor is deferred,
@@ -158,6 +185,25 @@ is a `### Decisions` entry, not a park — this phase is where most of them are 
 - **If `pr` is `n/a`:** push and open it now — `gh pr create --assignee seanmcgary` with the full
   description, linking the issue via `Closes #<issue>`.
 
+The PR always says `Closes #<issue>`: the review loops find the issue through that link. Merging
+closes the issue, so the **"## Acceptance"** table must be honest. It has one row per acceptance
+criterion and per "Done when" bullet, each **copied word for word from the issue**. Never reword a
+criterion to make it Met (for example, "decodes" is not "compiles"). Each row has one status:
+
+- `Met`.
+- `Not met` — open.
+- `Changed (see Deviations)` — closed only when the row links a human comment accepting the
+  change, or, for a live-environment criterion met by an in-repo test, links
+  `conventions.md` § No live-environment acceptance; otherwise open.
+- `Dropped (sign-off not given)` — closed only when it links a numbered gate question that was
+  unanswered or declined; the item is not built and is not a finding. A Dropped row for an item a
+  human approved, or with no such link, is open.
+
+**The PR is not ready while any row is open.** Do not set `status:ready-for-review` with an open
+row. Work this PR cannot do moves to a new issue (`gh issue create`), linked from the row. For an
+open `Changed` row or a split, push the PR (it stays reviewable with the diff), then park: list
+each open row in the blocker comment and ask the human to accept it. Their reply resumes the run.
+
 Either way: if the `### Decisions` list has entries, the PR body carries a **"Deviations from
 the approved plan"** section built from it — one bullet per entry, each naming what the plan
 said, what you did, and why. This is the whole payoff of deciding rather than asking: the human
@@ -169,8 +215,12 @@ The PR body carries three more sections when they have entries, and no others fo
 - **"Decisions needed"** — only questions an agent does not own alone (a public price, new
   recurring cost, a legal or compliance surface), each with your recommendation.
 - **"Pre-merge checks"** — checks that cannot run headless (a device, a simulator, VoiceOver).
+  Never a check against a live environment.
 - **"Deferred refactors"** — one bullet per major refactor, each linking the GitHub issue you
   filed for it.
+
+Any test the PR body cites as evidence (an Acceptance table, a "Testing" section) must be a
+behavioural test that the testing guide permits. Never cite a test the guide bans.
 
 There is no "Deferred", "Follow-ups", "Known gaps", or "Out of scope" section for anything else.
 A gap the feature advertises or depends on (the UI says "kept for 30 days" and no job purges) is
@@ -181,6 +231,12 @@ issue's labels — remove `status:ready-for-execution`, add `status:ready-for-re
 
 **Run the feedback loop** (`pr-feedback-loop`, N=3 default). Triage findings, apply fixes, reply
 to threads, repeat until a clean round or the cap.
+
+**The run owns the PR until it is clean.** `ready-for-review` does not end ownership while the PR
+has an unresolved bot thread, a bot review in CHANGES_REQUESTED, or an unanswered human comment.
+A later `build-feature` invocation on an issue at `status:ready-for-review` or
+`status:needs-execution-input` resumes from those: a human reply on the issue or PR **is** the
+input, and the run does not wait for a label change.
 
 **In a repo with no review bot, the only signals are CI status and human comments** — do not
 poll for a bot review that will never arrive. And in every repo, **do not block on slow CI for a
@@ -204,6 +260,10 @@ resolve on your own:
 4. **A missing or uncited design artifact** — the plan requires matching a design and the file
    isn't there (see phase 1).
 
+Missing credentials or a missing live environment is **never** a blocker. Write the in-repo test
+with fakes or synthetic data, and never ask a human to record or run anything against an
+environment (see "No live-environment acceptance" in `conventions.md`).
+
 ### Deviating from the plan — decide, log, surface
 
 **A deviation from the approved plan is NOT a blocker. Decide it yourself.** Approving the plan
@@ -220,14 +280,15 @@ For each one, **log it and keep going**:
    decision, not from memory at the end.
 2. Bump the `decisions` count in the Pipeline State table.
 3. At phase 4, render the whole list as a **"Deviations from the approved plan"** section in the
-   PR body.
+   PR body. The issue's `### Decisions` list is the record; the PR section is rendered from it
+   and must match it entry for entry.
 
 The human reviews these **at the PR**, with the diff in front of them — which is a better review
 than the same question answered blind in an issue comment, and it does not cost a full dispatch
 of latency. Surface the decision; do not ask for it.
 
-The plan describes the outcome, not a boundary. Widening the work to leave the code better is
-expected: fix the pre-existing defect on the feature's path, the shared primitive the feature
+The plan describes the outcome, not a boundary. Widening the work to fix defects is expected;
+widening it with behaviour the issue did not ask for is not: fix the pre-existing defect on the feature's path, the shared primitive the feature
 exposes, the backend half of a bug whose frontend half you fixed. What a deviation may never do
 is go UNLOGGED. Log every one in the same entry format and it reaches the PR body. Nothing is
 deferred except a major refactor, filed as a GitHub issue — see "Implement, don't defer" in
@@ -236,7 +297,7 @@ deferred except a major refactor, filed as a GitHub issue — see "Implement, do
 When you hit one: commit and **push** your work first, then post the blocker as an issue comment
 @-mentioning `@seanmcgary`, set `status:needs-execution-input` (removing
 `status:ready-for-execution`), and STOP with a status report. The run resumes when a human
-resolves it and re-applies `status:ready-for-execution`.
+replies to the blocker comment or re-applies `status:ready-for-execution`, whichever comes first.
 
 **Never merge.** That stays a human decision.
 

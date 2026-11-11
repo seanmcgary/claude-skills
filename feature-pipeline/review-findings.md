@@ -103,7 +103,8 @@ The example summary line counts every section: 53 = 47 Fix + 5 Reject + 1 Defer,
 
 - **A real finding is Fix.** Apply "Implement, don't defer" in `conventions.md` to every finding.
   "Pre-existing," "outside the diff," "the plan did not cover it," and "it needs a migration" are
-  not reasons to Defer.
+  not reasons to Defer. A finding that asks for behaviour the issue did not request is not a
+  defect: Reject it with "not in the issue".
 - **Group by FILE, not by finding.** One `####` heading per file, holding every Fix finding in
   that file. This is the whole reason for the format: 40+ findings collide on far fewer files,
   and two subagents editing one file is a lost write. The heading is a repo-relative path in
@@ -128,12 +129,13 @@ The example summary line counts every section: 53 = 47 Fix + 5 Reject + 1 Defer,
   of them pushes the derivation back onto the executor. If the reviewer's prescription is wrong
   or vague, the triager writes the correct one. If the fix cannot be written at line level, the
   finding is cross-cutting. It is never a Defer.
-- **A product or design choice with no plan or design behind it is a Fix.** The triager picks the
+- **A product or design choice with no plan or design behind it, needed to fix a defect, is a Fix.** The triager picks the
   option, writes the fix, and starts the Finding cell with `Decision:` and the reason. The
   executor logs it as a deviation. Only a question an agent does not own alone (a public price,
   new recurring cost, a legal or compliance surface) goes in `Decisions needed`.
 - **`Pre-merge checks`** holds checks that cannot run headless: a device, a simulator,
-  VoiceOver, a real vendor build. They are not deferrals. The executor copies them into the PR
+  VoiceOver. Never a check against a live environment (`conventions.md` § No live-environment
+  acceptance). They are not deferrals. The executor copies them into the PR
   body.
 - **A branch-level finding** (a commit message, branch history) is Reject when the repository
   squash-merges, because the PR title becomes the commit. Otherwise it is cross-cutting.

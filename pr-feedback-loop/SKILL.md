@@ -13,7 +13,7 @@ This skill implements a disciplined multi-round feedback loop for addressing PR 
 - **Push back** — the finding is incorrect or the current code is defensible-as-is. Reply with specific technical reasoning.
 - **Defer** — ONLY a major refactor, as "Implement, don't defer" in `$SKILLS_ROOT/feature-pipeline/conventions.md` defines it. File a GitHub issue and reply with its link. Never a `TODO` comment.
 
-A valid finding is Fix by default. "Pre-existing," "out of scope for this PR," "not in the plan," and "needs a migration" are not reasons to defer: the pipeline leaves code better than it found it.
+A valid finding — a real defect — is Fix by default. "Pre-existing," "out of scope for this PR," "not in the plan," and "needs a migration" are not reasons to defer a defect: the pipeline leaves code better than it found it. A finding that asks for new behaviour the issue did not request (an option, a validation rule, hardening, a helper for a future caller) is not a defect: push back with "not in the issue", or file it as a new issue.
 
 Pushing back is legitimate and expected. A reviewer flagging dead code that has an intentional rationale, or requesting an export that would break encapsulation, deserves a reasoned disagreement — not blind compliance.
 
@@ -25,6 +25,12 @@ Pushing back is legitimate and expected. A reviewer flagging dead code that has 
 - "I don't need to wait for the bot" — NO. Always wait for the review before acting.
 
 ## Setup
+
+### Find the PR
+
+If you were not given a PR number, run `gh pr list --head <branch> --state open`. Exactly one
+result is the PR; use it (and record it in Pipeline State when one exists). Ask only when there
+are several.
 
 ### If no PR exists yet
 
@@ -144,8 +150,12 @@ For EACH finding, decide:
 | Decision | Criteria | Action |
 |---|---|---|
 | **Fix** | Reviewer is correct; code has a real bug, security issue, or convention violation with no legitimate counter-argument | Implement the fix |
-| **Push back** | Current code is defensible. There is a specific technical reason (documented in comments, architecture decision) why the code is correct as-is. "Out of scope" is not a technical reason | Reply with reasoning; do NOT change the code |
+| **Push back** | Current code is defensible. There is a specific technical reason (documented in comments, architecture decision) why the code is correct as-is. Or the finding asks for new behaviour the issue did not request ("not in the issue"). "Out of scope" is not a reason to leave a real defect | Reply with reasoning; do NOT change the code |
 | **Defer** | ONLY a major refactor: it restructures a subsystem or module boundary across many consumers, and this PR is correct and safe without it. Never security, data integrity, or anything this PR advertises or depends on | `gh issue create` with the finding, the evidence, and the recommended approach; reply with the issue link. No `TODO` comment |
+
+**Acceptance findings:** a finding that the PR says `Closes #<issue>` while its "## Acceptance" table has an open row (statuses per `build-feature` Phase 4) is always Fix: correct the row or finish the work, never remove `Closes`. For an open Dropped row, the fix is to link its gate question; build the item only if a human answered "yes". A `Dropped (sign-off not given)` row is closed only when it links a numbered gate question that was unanswered or declined: the item is not built, so push back on a finding asking to build it. A Dropped row for an approved item, or with no such link, is open.
+
+**Evidence:** never answer a finding with "verified manually against dev" or "needs an environment". Write the in-repo test that proves it (`conventions.md` § No live-environment acceptance). A reviewer asking for a live-environment check gets the test instead.
 
 **Bot findings:** Triage autonomously using the criteria above. The bot is often right about security and conventions, but may over-flag dead code or suggest exports that break encapsulation.
 
@@ -157,12 +167,12 @@ For EACH finding, decide:
 
 For findings triaged as "Fix":
 - Make the code changes
-- Add or update tests if the fix warrants it
+- Add or update tests if the fix warrants it. Before you write or change a test, read the testing guide (see "Project standards docs" in `$SKILLS_ROOT/feature-pipeline/conventions.md`). A reviewer comment that flags a test as banned by the guide is a Fix: delete the test, add the behavioural test the comment names, and correct any PR-body evidence that cited it.
 - Keep changes minimal and focused
 
 ### 6. Pre-push quality gates
 
-**Always run format/lint plus the tests covering the changed code before committing.** Run the full test suite locally only when it is cheap; each push runs the full suite in CI, and that is where cross-task regressions surface in this loop (see "Test cadence" in `conventions.md`). Discover the commands from the project's conventions doc (the first agent-instructions/standards file that exists at the repo root — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `STANDARDS.md`), the `Makefile`, or the package manifest (`package.json` scripts, `Cargo.toml`, `pyproject.toml`, etc.). Typical shapes: `make fmt` / `make lint` / `make test`, `npm run format` / `npm run lint` / `npm test`, `cargo fmt` / `cargo clippy` / `cargo test`.
+**Always run format/lint plus the tests covering the changed code before committing.** Run the full test suite locally only when it is cheap; each push runs the full suite in CI, and that is where cross-task regressions surface in this loop (see "Test cadence" in `conventions.md`). Discover the commands from the project's conventions doc (resolved per "Project standards docs" in `conventions.md`), the `Makefile`, or the package manifest (`package.json` scripts, `Cargo.toml`, `pyproject.toml`, etc.). Typical shapes: `make fmt` / `make lint` / `make test`, `npm run format` / `npm run lint` / `npm test`, `cargo fmt` / `cargo clippy` / `cargo test`.
 
 If a gate fails for reasons **unrelated to your changes** (pre-existing failures on the default branch), note this in your status report and proceed. If a gate fails **because of your changes**, fix the issue before committing.
 

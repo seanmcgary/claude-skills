@@ -37,6 +37,51 @@ agent-specific paths or tool names.
 - **PR review bot.** The review source is detected per repo, not assumed to be a specific bot
   (see `pr-feedback-loop` and the "repositories without a PR review bot" rule below).
 
+## Project standards docs
+
+Every pipeline skill reads the project's rules from repo files. This section is the one
+definition of which files those are. A skill that says "the conventions doc" means the resolved
+set below; a skill that says "the testing guide" means the file named under "The testing guide".
+
+**The conventions doc** is every one of these that exists, read in this order:
+
+1. At the repo root: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `CONVENTIONS.md`,
+   `STANDARDS.md`, `STYLEGUIDE.md`/`STYLE.md`, `TESTING.md`.
+2. Every repo doc that a file in step 1 links to as a rule source (for example
+   `[CONVENTIONS.md → Logging](CONVENTIONS.md#logging)`, `docs/go/CONVENTIONS.md`).
+3. A scoped doc in or above a directory the change touches (`docs/<language>/CONVENTIONS.md`,
+   `<pkg>/CONVENTIONS.md`, `<pkg>/TESTING.md`). It adds to the root docs for that code.
+
+Read all of them. They are not alternatives; a later file adds to an earlier one. Only
+`AGENTS.md`/`CLAUDE.md` load into an agent session automatically. Every other file in the set is
+read only when a step tells the agent to read it, so give subagents the paths, not "the
+conventions doc" as a phrase.
+
+**Machine-enforced style** — `.editorconfig` and the linter/formatter configs — is the source of
+truth for format and lint rules. The mechanical gates run it.
+
+### The testing guide
+
+The testing guide is `TESTING.md` (root or scoped), or else the section of the conventions doc
+that sets rules for tests. When a testing guide exists:
+
+- **Every agent that writes, changes, plans, or reviews a test reads the testing guide first.**
+  This includes implementers, review remediators, PR-feedback fixers, and plan authors. The
+  dispatch prompt names its path.
+- **The testing guide overrides this pipeline's test rules.** "One test per behaviour, at the
+  outermost surface", "cover it with a test", and "missing tests are a finding" are defaults, and the guide wins in both directions: they never delete a test the guide requires, and never require a
+  test the guide bans. When the guide says a test must catch a named bug, a function with no
+  such bug to catch gets no test, and that is not a finding.
+- **A test the guide bans is a defect, the same as a bug.** A reviewer flags it at the severity
+  of a blocking change (HIGH) and cites the guide's section. The prescribed fix is to delete it.
+  If the behaviour it claimed to cover has no real test, the fix also names the behavioural test
+  to add in its place (for example, boundary rows in an existing encode/decode test).
+- **PR acceptance evidence cites behavioural tests only.** A PR body, plan acceptance criterion,
+  or `Tests:` line that points at a test the guide bans is wrong evidence. Point it at the test
+  that exercises the behaviour.
+
+When no testing guide exists, the pipeline's default test rules apply.
+
 ## Profiles: scale to the domain
 
 Right-Sizing (below) scales ceremony to the *weight* of a change. **Profiles** scale it to the
@@ -76,8 +121,8 @@ When unsure, pick the heavier class.
 | | **Small** | **Standard** | **Large** |
 |---|---|---|---|
 | **Trigger** | mechanical / interface-preserving, adds no surface, touches no risky boundary | adds surface OR is semantic/behavioral OR touches a risky boundary in a contained way | new subsystem, schema/migration, security or money boundary, cross-repo contract, or a semantic change spanning many consumers |
-| **Spec** | SKIP the written spec — the premise check is the correctness gate and the plan doubles as the spec | brainstorm → written spec | brainstorm → written spec (decompose if needed) |
-| **Brainstorm** | premise check + confirm approach in one exchange | full brainstorming | full brainstorming + decompose |
+| **Spec** | SKIP the written spec — the premise check is the correctness gate and the plan doubles as the spec | written spec | written spec (decompose if needed) |
+| **Brainstorm** | premise check + confirm approach in one exchange | full brainstorming, unless the issue already carries a design | full brainstorming + decompose, unless the issue already carries a design |
 | **Plan** | lightweight (still house style; tasks may be coarse) | full plan | full plan |
 | **Plan review** | ONE reviewer pass (combined dimensions), unless the premise check flagged risk | three-dimension `reviewing-plans` | three-dimension `reviewing-plans` |
 | **Implementation** | inline (`executing-plans`), no per-task subagent relay | subagent-driven, batch trivial tasks | subagent-driven, one task per subagent |
@@ -128,9 +173,16 @@ If the executor struggles, the fix is a better-specified plan — not a more exp
 This section is the single definition of when work may be deferred. Every skill in this pipeline
 that plans, implements, reviews, or triages applies it. None redefines it.
 
-**The issue and the approved plan describe the outcome. They are not a boundary.** Every agent in
-this pipeline, the implementers and the reviewers alike, is trusted to leave the code better than
-it found it. A real defect found while doing the work is fixed while doing the work.
+**The issue and the approved plan describe the outcome. They are not a boundary on fixing
+defects, and they are the boundary on new behaviour.** Every agent in this pipeline, the
+implementers and the reviewers alike, is trusted to leave the code better than it found it. A real
+defect found while doing the work is fixed while doing the work.
+
+**"Fix" means fix a defect. It does not mean build.** A finding that asks for behaviour the issue
+did not request — an option, a validation rule, a hardening path, a helper for a future caller —
+is not a defect. It is **Reject** with the note "not in the issue", or a new GitHub issue if the
+reviewer still believes it is needed. The "Never deferrable" list below is unchanged: security,
+data integrity, and a defect this branch introduced are always Fix.
 
 ### A real finding is Fix
 
@@ -195,7 +247,30 @@ is a `TODO`:
   legal or compliance surface. For those, list the question in the PR body's
   **"Decisions needed"** section and @-mention `@seanmcgary`.
 - **A manual check.** A check that cannot run in a headless environment (a device, a simulator,
-  VoiceOver, a real vendor build). List it in the PR body's **"Pre-merge checks"** section.
+  VoiceOver). List it in the PR body's **"Pre-merge checks"** section. A check against a live
+  environment is never one of these; see below.
+
+### No live-environment acceptance
+
+A PR never requires acceptance against a live environment (a dev, staging or production
+deployment, a cluster, a live provider). Every requirement — including one worded "against dev",
+"recorded fixtures", or "the same fixtures as service X" — is met by a test in the repo (unit,
+integration, or E2E) that uses fakes or synthetic or generated data. So:
+
+- Missing cluster credentials or a missing live environment is never a blocker, and no run parks
+  for one or asks a human to record or run anything against one.
+- No plan adds a live-environment step, verification, or pre-merge check.
+- "Verified manually against dev" and "not verified locally, needs an environment" are not
+  evidence. The test is.
+- An acceptance criterion that needs a live environment (worded "live", "recorded", "against
+  dev", "the same fixtures as service X", or similar) is `Changed (see Deviations)`, satisfied by
+  the test. This rule is the human's standing acceptance of that change: the row links this
+  section instead of a comment, and it is closed.
+- Agents never dispatch a live integration suite for a PR.
+
+The one exception: a repo may name, in its conventions doc, a gate that verifies a vendor artifact
+against an environment (not feature acceptance). That named gate runs as the repo says; nothing
+else does.
 
 ## Review cadence: one authoritative pass; converge, don't ratchet
 
@@ -205,13 +280,17 @@ find NEW findings in. This cadence keeps review value high while making the loop
 
 1. **Per-task review is conditional.** Only tasks the plan tags `review: yes` get a per-task
    reviewer. `review: no` tasks are gated by their own acceptance criteria (tests, or the
-   frontend profile's render/screenshot check). A well-specified plan makes most tasks `review: no`.
+   frontend profile's render/screenshot check). A well-specified plan makes most tasks `review: no`;
+   more than a third tagged `review: yes` means the plan is under-specified.
 2. **Exactly ONE authoritative whole-diff fan-out per run**, at commit review. Implementation
    does NOT additionally run subagent-driven-development's separate final whole-branch review.
 3. **Re-reviews are scope-bounded.** After a fix, the re-review verifies ONLY that the fix
    resolves its finding and introduces no regression in the touched lines. It does NOT re-scan
    the whole diff. This is what stops the ratchet.
 4. **The PR feedback loop is capped** (default N=3); a clean round exits immediately.
+5. **Count the review surfaces.** When the repo has two or more PR review bots, the commit-review
+   fan-out drops to one combined reviewer (quality + standards), plus security only for tasks
+   tagged `review: yes`. The bots already give the diff independent reads.
 
 If a task feels like it needs its own reviewer, the fix is to tag it `review: yes` **in the
 plan** — decided by the senior planner up front, not improvised mid-execution.

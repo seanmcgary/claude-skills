@@ -155,7 +155,8 @@ stage-5 rounds. It stays a draft until stage 5.
    also verify the seam end-to-end (real UI action → real API → real data layer).
 2. **Every implementer dispatch carries the headless override** defined in `build-feature`
    phase 2 (decide rather than ask, leave touched files better, no `TODO` comments, no deferred
-   work). Append it verbatim to each implementer's prompt, and fix a task reviewer's Minor
+   work, read and obey the testing guide). Append it verbatim to each implementer's prompt,
+   with the testing-guide path filled in, and fix a task reviewer's Minor
    findings in the task's fix round rather than recording them as deferred.
 3. Apply the **Review Cadence**: dispatch a per-task reviewer (at the `senior` tier) ONLY for
    tasks tagged `review: yes`; `review: no` tasks are gated by their own acceptance criteria. Do
