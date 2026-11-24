@@ -118,9 +118,11 @@ the plan and record them in `design assets`. Nothing to sync.
 
 1. **Read the real source from its Artifact with the Artifact tool** — never a browser, never
    memory, never a reconstruction from a screenshot or the issue text. Designs live in a
-   claude.ai Artifact (typically a design canvas with several pages). The issue, its parent
-   epic, or the consuming repo's design index (for example `docs/design/README.md`) names its
-   URL. Call the Artifact tool with `action: "read"` on that URL. For a canvas,
+   claude.ai Artifact (typically a design canvas with several pages). **The issue names the
+   target Artifact(s) by URL, and only the issue does.** Never fall back to a URL found in the
+   repo, a parent epic or an earlier issue: if the feature has a visual surface and the issue
+   names no Artifact, go to step 5 and ask for it. Call the Artifact tool with
+   `action: "read"` on each URL the issue names. For a canvas,
    `path: "project/compat.json"` lists the pages, and `paths` fetches the pages you need and
    their `img/` files whole. When the issue says the design was reviewed on the Artifact, read
    that feedback with `ArtifactComments`. This works the same in a background dispatch as in a
@@ -142,9 +144,9 @@ the plan and record them in `design assets`. Nothing to sync.
 4. **Record and cite.** Put every committed path in Pipeline State's `design assets`, add a
    `### Design assets` section to the plan listing them, and — everywhere the plan says "match
    the design" — cite the committed path. Never a bare URL.
-5. **If you cannot find or read the source** (no Artifact URL, the Artifact tool is unavailable,
-   or the read fails): post exactly which Artifact or page is missing and where you looked, and
-   STOP. Do not write a plan that tells the executor to approximate.
+5. **If you cannot find or read the source** (the issue names no Artifact URL, the Artifact tool
+   is unavailable, or the read fails): post exactly which Artifact or page is missing and what
+   the issue needs to name, and STOP. Do not write a plan that tells the executor to approximate.
 
 ## Phase 4 — Write the plan
 
